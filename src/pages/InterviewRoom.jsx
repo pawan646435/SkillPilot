@@ -6,7 +6,8 @@ import {
   Mic, MicOff, Send, Loader2, ChevronRight,
   BrainCircuit, Lightbulb, X
 } from "lucide-react";
-import { generateInterviewQuestion, evaluateAnswer, generateFinalReport } from "../services/geminiService";import { auth, db } from "../lib/firebase";
+import { generateInterviewQuestion, evaluateAnswer, generateFinalReport } from "../services/geminiService";
+import { auth, db } from "../lib/firebase";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Noise from "../components/Noise";
 
@@ -41,6 +42,7 @@ export default function InterviewRoom() {
 
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
+  const hasLoadedInitialQuestionRef = useRef(false);
 
   const loadNextQuestion = async (previousQA) => {
     setPhase(PHASE.LOADING_QUESTION);
@@ -61,6 +63,8 @@ export default function InterviewRoom() {
 
   // Load first question on mount
   useEffect(() => {
+    if (hasLoadedInitialQuestionRef.current) return;
+    hasLoadedInitialQuestionRef.current = true;
     loadNextQuestion([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
