@@ -1,0 +1,25 @@
+/* src/index.css */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+  --font-geist-sans: "Inter", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-geist-mono: "JetBrains Mono", "Fira Code", "SFMono-Regular", Menlo, monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-geist-sans);
+  overflow-x: clip;
+}
+
+/* Hide default cursor on desktop devices because we are using CustomCursor */
+@media (pointer: fine) {
+  body, a, button { 
+    cursor: none; 
+  }
+}
