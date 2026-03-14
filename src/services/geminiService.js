@@ -1,43 +1,109 @@
-// src/services/geminiService.js
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
-const BASE_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama-3.3-70b-versatile";
+const FETCH_NEWS_URL = "https://fetchnews-whrhzzz3ca-el.a.run.app";
+const FETCH_GROQ_CHAT_URL = "https://fetchgroqchat-whrhzzz3ca-el.a.run.app";
 
-async function callAI(prompt) {
-  if (!GROQ_API_KEY) {
-    throw new Error("Missing VITE_GROQ_API_KEY in .env file");
+function getErrorMessage(error, fallback) {
+  return error?.message || error?.details?.message || fallback;
+}
+
+function stripJsonFences(text) {
+  return String(text || "")
+    .replace(/```json\s*/gi, "")
+    .replace(/```\s*/gi, "")
+    .trim();
+}
+
+async function callGroqProxy(messages) {
+  try {
+    const data = await postCallableJson(FETCH_GROQ_CHAT_URL, { messages }, "AI proxy request failed.");
+    const content = data?.choices?.[0]?.message?.content;
+
+    if (typeof content !== "string") {
+      throw new Error("Invalid AI proxy response.");
+    }
+
+    return content;
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "AI proxy request failed."));
   }
+}
 
-  const res = await fetch(BASE_URL, {
+async function postJson(url, payload, fallback) {
+  const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "Authorization": `Bearer ${GROQ_API_KEY}`,
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.7,
-      max_tokens: 1024,
-      response_format: { type: "json_object" }
-    }),
+    body: JSON.stringify(payload),
   });
 
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}));
-    throw new Error(err?.error?.message || `API error: ${res.status}`);
+  let data = null;
+  let text = "";
+
+  try {
+    data = await response.json();
+  } catch {
+    text = await response.text().catch(() => "");
   }
 
-  const data = await res.json();
-  const raw = data.choices?.[0]?.message?.content || "";
-  // Strip markdown code fences if model wraps JSON in them
-  return raw.replace(/```json\n?/gi, "").replace(/```\n?/gi, "").trim();
+  if (!response.ok) {
+    const message =
+      data?.error?.details ||
+      data?.error?.message ||
+      data?.message ||
+      text ||
+      `${fallback} (HTTP ${response.status})`;
+    throw new Error(message);
+  }
+
+  return data;
 }
 
-/**
- * Generate the next interview question.
- * Returns: { question, topic, hint }
- */
+async function postCallableJson(url, payload, fallback) {
+  const data = await postJson(url, { data: payload }, fallback);
+  return data?.result ?? data?.data ?? data;
+}
+
+async function callStructuredAI(prompt) {
+  const raw = await callGroqProxy([
+    {
+      role: "system",
+      content: "Return only valid JSON. Do not add markdown, code fences, or explanatory text.",
+    },
+    { role: "user", content: prompt },
+  ]);
+  return stripJsonFences(raw);
+}
+
+function parseJsonResponse(text, fallback) {
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error(fallback);
+  }
+}
+
+export async function getNewsFromProxy(category, query, pageNum = 1) {
+  try {
+    const data = await postCallableJson(
+      FETCH_NEWS_URL,
+      {
+        category: category?.id || category || "technology",
+        query: query || category?.query || "",
+        pageNum,
+      },
+      "News proxy request failed."
+    );
+
+    return data || {};
+  } catch (error) {
+    throw new Error(getErrorMessage(error, "News proxy request failed."));
+  }
+}
+
+export async function generateGeminiResponse(messages) {
+  return callGroqProxy(messages);
+}
+
 export async function generateInterviewQuestion(role, difficulty, previousQA = []) {
   const history =
     previousQA.length > 0
@@ -57,21 +123,17 @@ You MUST respond ONLY with a valid JSON object. No explanation, no markdown, jus
   "hint": "a subtle one-sentence hint if the candidate gets stuck"
 }`;
 
-  const text = await callAI(prompt);
-  return JSON.parse(text);
+  const text = await callStructuredAI(prompt);
+  return parseJsonResponse(text, "Interview question proxy returned invalid JSON.");
 }
 
-/**
- * Evaluate a candidate's answer.
- * Returns: { score, feedback, strengths, improvements, modelAnswer }
- */
 export async function evaluateAnswer(question, answer, role, difficulty) {
   if (!answer || answer.trim().length < 5) {
     return {
       score: 0,
       feedback: "No answer was provided.",
       strengths: [],
-      improvements: ["Always attempt to answer — even a partial answer shows thought process."],
+      improvements: ["Always attempt to answer - even a partial answer shows thought process."],
       modelAnswer: "A complete answer would address the key concepts of the question directly.",
     };
   }
@@ -94,14 +156,10 @@ You MUST respond ONLY with a valid JSON object. No explanation, no markdown, jus
   "modelAnswer": "<what a great answer would include in 2-3 sentences>"
 }`;
 
-  const text = await callAI(prompt);
-  return JSON.parse(text);
+  const text = await callStructuredAI(prompt);
+  return parseJsonResponse(text, "Interview evaluation proxy returned invalid JSON.");
 }
 
-/**
- * Generate a comprehensive final interview report.
- * Returns: { overallScore, grade, summary, topStrengths, criticalImprovements, hiringRecommendation, recommendationReason, nextSteps }
- */
 export async function generateFinalReport(role, difficulty, allQA) {
   const qaBreakdown = allQA
     .map(
@@ -134,6 +192,6 @@ You MUST respond ONLY with a valid JSON object. No explanation, no markdown, jus
   "nextSteps": ["<resource or action 1>", "<resource or action 2>", "<resource or action 3>"]
 }`;
 
-  const text = await callAI(prompt);
-  return JSON.parse(text);
+  const text = await callStructuredAI(prompt);
+  return parseJsonResponse(text, "Final report proxy returned invalid JSON.");
 }

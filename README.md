@@ -30,17 +30,14 @@ npm run lint     # Run ESLint
 
 ## Environment Variables
 
-Create a `.env` file in the project root and add the keys below:
+The frontend no longer uses `VITE_GROQ_API_KEY` or `VITE_GNEWS_API_KEY`.
 
-```env
-VITE_GROQ_API_KEY=your_groq_key
-VITE_GNEWS_API_KEY=your_gnews_key
-```
+External API traffic is routed through Firebase Cloud Functions deployed in `asia-south1`:
 
-Notes:
+- `fetchGroqChat`
+- `fetchNews`
 
-- The AI interview service uses `VITE_GROQ_API_KEY`.
-- The News page uses `VITE_GNEWS_API_KEY`.
+The client connects to those functions through `firebase/functions`, so no browser-exposed API secrets are required in `.env`.
 
 ## Run Locally
 
@@ -151,4 +148,4 @@ skillpilot/
 
 - Run `npm run build` before deployment.
 - Serve the `dist/` folder from your static hosting provider.
-- Ensure environment variables are configured in your hosting platform.
+- Ensure the Firebase proxy functions are deployed in `asia-south1`.

@@ -4,8 +4,7 @@ import { motion as Motion, AnimatePresence } from "framer-motion";
 import { Newspaper, Search, ExternalLink, RefreshCw, Clock, X, Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
 import { auth } from "../lib/firebase";
 import { onAuthStateChanged } from "firebase/auth";
-
-const GNEWS_KEY = import.meta.env.VITE_GNEWS_API_KEY;
+import { getNewsFromProxy } from "../services/geminiService";
 
 const CATEGORIES = [
   { id: "technology", label: "All Tech" },
@@ -197,32 +196,12 @@ export default function News() {
   }, [selectedInterests, storagePrefix]);
 
   const fetchNews = useCallback(async (cat, query, pageNum, append = false) => {
-    if (!GNEWS_KEY) {
-      setError("Missing VITE_GNEWS_API_KEY in your .env file.");
-      setLoading(false);
-      return;
-    }
-
     if (!append) setLoading(true);
     else setLoadingMore(true);
     setError(null);
 
     try {
-      let url;
-      const searchTerm = query || cat.query;
-
-      if (searchTerm && cat.id !== "technology") {
-        url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(searchTerm)}&lang=en&max=9&page=${pageNum}&token=${GNEWS_KEY}`;
-      } else if (query) {
-        url = `https://gnews.io/api/v4/search?q=${encodeURIComponent(query)}&lang=en&max=9&page=${pageNum}&token=${GNEWS_KEY}`;
-      } else {
-        url = `https://gnews.io/api/v4/top-headlines?category=technology&lang=en&max=9&page=${pageNum}&token=${GNEWS_KEY}`;
-      }
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error(`API error ${res.status}`);
-      const data = await res.json();
-
+      const data = await getNewsFromProxy(cat, query, pageNum);
       const newArticles = data.articles || [];
       setArticles((prev) => append ? [...prev, ...newArticles] : newArticles);
       setHasMore(newArticles.length === 9);
@@ -460,11 +439,6 @@ export default function News() {
             className="p-6 text-center border rounded-2xl bg-rose-400/5 border-rose-400/20"
           >
             <p className="mb-2 text-sm text-rose-400">{error}</p>
-            {!GNEWS_KEY && (
-              <p className="font-mono text-xs text-neutral-600">
-                Add VITE_GNEWS_API_KEY=your_key to your .env file. Get a free key at gnews.io
-              </p>
-            )}
           </Motion.div>
         )}
       </AnimatePresence>
