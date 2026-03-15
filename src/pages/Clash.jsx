@@ -151,6 +151,7 @@ export default function Clash() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [runState, setRunState] = useState({ running: false, submitting: false, error: "", output: null });
   const [finalizedResult, setFinalizedResult] = useState(null);
+  const [abortedInfo, setAbortedInfo] = useState(null);
   const [creatingBattle, setCreatingBattle] = useState(false);
 
   // ─── 1. BOOT SEQUENCE & AUTH CHECK ───
@@ -314,6 +315,15 @@ export default function Clash() {
         setFinalizedResult(data.result || null);
       }
 
+      if (data.status === "ABORTED") {
+        const abortedBy = data?.abortedBy || null;
+        setAbortedInfo(abortedBy);
+
+        if (abortedBy?.uid !== auth.currentUser?.uid) {
+          setView("ABORTED");
+        }
+      }
+
       if (role === "player1" && data.player2) {
         setOpponentCode(data.player2.code);
         setMyCode((prev) => data.player1?.code || prev);
@@ -383,6 +393,32 @@ export default function Clash() {
     } catch (error) {
       setRunState((prev) => ({ ...prev, error: error.message || "Could not finalize battle" }));
     }
+  };
+
+  const abortBattle = async () => {
+    if (!roomId || !playerRole) {
+      navigate("/dashboard");
+      return;
+    }
+
+    setRunState((prev) => ({ ...prev, error: "" }));
+
+    try {
+      const roomRef = doc(db, "battles", roomId);
+      await updateDoc(roomRef, {
+        status: "ABORTED",
+        abortedBy: {
+          uid: auth.currentUser?.uid || null,
+          name: auth.currentUser?.displayName || "A player",
+        },
+        updatedAt: serverTimestamp(),
+      });
+    } catch (error) {
+      setRunState((prev) => ({ ...prev, error: error.message || "Could not abort battle" }));
+      return;
+    }
+
+    navigate("/dashboard");
   };
 
   const copyInviteLink = () => {
@@ -477,6 +513,24 @@ export default function Clash() {
           </motion.div>
         )}
 
+        {view === "ABORTED" && (
+          <motion.div key="aborted" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 flex items-center justify-center h-screen px-6">
+            <div className="w-full max-w-xl rounded-2xl border border-rose-500/30 bg-black/70 p-10 text-center shadow-[0_0_40px_rgba(244,63,94,0.12)] backdrop-blur-md">
+              <AlertTriangle className="mx-auto mb-5 h-14 w-14 text-rose-400" />
+              <h2 className="mb-3 text-3xl font-bold uppercase tracking-[0.2em] text-rose-300">Battle Aborted</h2>
+              <p className="mb-8 text-sm leading-7 text-rose-100/75">
+                {(abortedInfo?.name || "Your opponent")} has left the battle.
+              </p>
+              <button
+                onClick={() => navigate("/dashboard")}
+                className="border border-rose-400/40 px-6 py-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-200 transition-all hover:bg-rose-500/10"
+              >
+                Return To Dashboard
+              </button>
+            </div>
+          </motion.div>
+        )}
+
         {/* BATTLE ARENA (SPLIT SCREEN) */}
         {view === "BATTLE" && (
           <motion.div key="battle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 flex flex-col h-screen">
@@ -488,7 +542,7 @@ export default function Clash() {
               <div className="text-2xl font-black tracking-widest drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]">ROOM: {roomId}</div>
               <div className="flex items-center gap-2">
                 <button onClick={finalizeBattle} className="text-xs border border-amber-400/50 text-amber-300 px-3 py-1 hover:bg-amber-400/20 uppercase tracking-widest">Finalize</button>
-                <button onClick={() => navigate("/dashboard")} className="text-xs border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41]/20 uppercase tracking-widest">Abort</button>
+                <button onClick={abortBattle} className="text-xs border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41]/20 uppercase tracking-widest">Abort</button>
               </div>
             </header>
 
