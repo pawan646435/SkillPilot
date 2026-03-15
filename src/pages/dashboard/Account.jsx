@@ -44,6 +44,10 @@ export default function Account() {
     fetchProfile();
   },[]);
 
+  const getDisplayName = () => {
+    return user?.name || user?.displayName || user?.email?.split("@")[0] || "User";
+  };
+
   const showToast = (msg, type = "success") => {
     setToast({ msg, type });
     setTimeout(() => setToast(null), 4000);
@@ -153,7 +157,7 @@ export default function Account() {
           </div>
 
           <div className="flex-1">
-            <h2 className="text-2xl font-bold text-white font-display">{user.name || "User"}</h2>
+            <h2 className="text-2xl font-bold text-white font-display">{getDisplayName()}</h2>
             <p className="mt-1 font-mono text-sm text-neutral-500">{user.email}</p>
             <div className="flex flex-wrap items-center gap-3 mt-3">
               <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold uppercase tracking-widest ${user.role === "ADMIN" ? "bg-amber-500/10 text-amber-400 border border-amber-500/20" : "bg-blue-500/10 text-blue-400 border border-blue-500/20"}`}>
@@ -276,4 +280,3 @@ export default function Account() {
     </div>
   );
 }
-

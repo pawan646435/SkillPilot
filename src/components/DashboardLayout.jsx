@@ -38,6 +38,10 @@ export default function DashboardLayout() {
     return user.photoURL;
   };
 
+  const getDisplayName = () => {
+    return user?.name || user?.displayName || user?.email?.split("@")[0] || "User";
+  };
+
   const handleLogout = async () => {
     await signOut(auth);
     navigate("/login");
@@ -132,15 +136,15 @@ export default function DashboardLayout() {
             >
               <div className="flex items-center justify-center w-8 h-8 overflow-hidden border rounded-lg border-white/10 bg-neutral-800 shrink-0">
                 {getAvatarUrl() ? (
-                  <img src={getAvatarUrl()} alt={user.name || "User"} className="object-cover w-full h-full" />
+                  <img src={getAvatarUrl()} alt={getDisplayName()} className="object-cover w-full h-full" />
                 ) : (
                   <span className="text-sm font-bold text-neutral-400">
-                    {user.name?.charAt(0).toUpperCase() || user.email?.charAt(0).toUpperCase() || "U"}
+                    {getDisplayName().charAt(0).toUpperCase()}
                   </span>
                 )}
               </div>
               <div className="overflow-hidden">
-                <p className="text-sm font-medium text-white truncate">{user.name || "User"}</p>
+                <p className="text-sm font-medium text-white truncate">{getDisplayName()}</p>
                 <p className="text-xs truncate text-neutral-500">{user.email}</p>
               </div>
             </Link>

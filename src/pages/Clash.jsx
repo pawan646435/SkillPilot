@@ -5,9 +5,9 @@ import { Terminal, Users, Play, Copy, CheckCircle2, Code2, AlertTriangle, Loader
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { auth, db } from "../lib/firebase";
-import { doc, setDoc, getDoc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { fetchClashQuestions, finalizeClashMatch, generateClashQuestions, runClashCode, submitClashAnswer } from "../services/clashService";
+import { fetchClashQuestions, finalizeClashMatch, generateClashQuestions, joinClashRoom, runClashCode, submitClashAnswer } from "../services/clashService";
 
 const DEFAULT_CODE_BY_LANGUAGE = {
   javascript: `function solution(...args) {
@@ -87,12 +87,13 @@ export default function Clash() {
 
   // ─── 1. BOOT SEQUENCE & AUTH CHECK ───
   useEffect(() => {
+    let bootTimer = null;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         // User is logged in, proceed with boot sequence
-        setTimeout(() => {
+        bootTimer = setTimeout(() => {
           if (roomFromUrl) {
-            handleJoinRoom(roomFromUrl, user);
+            handleJoinRoom(roomFromUrl);
           } else {
             setView("LOBBY");
           }
@@ -107,7 +108,12 @@ export default function Clash() {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribe();
+      if (bootTimer) {
+        clearTimeout(bootTimer);
+      }
+    };
   }, [navigate, roomFromUrl]);
 
   useEffect(() => {
@@ -186,42 +192,34 @@ export default function Clash() {
   };
 
   // ─── 3. JOIN A BATTLE ROOM ───
-  const handleJoinRoom = async (idToJoin, user) => {
-    const roomRef = doc(db, "battles", idToJoin);
-    const roomSnap = await getDoc(roomRef);
+  const handleJoinRoom = async (idToJoin) => {
+    try {
+      const response = await joinClashRoom({ roomId: idToJoin });
+      const joinedRoom = response?.room;
+      const role = response?.role;
 
-    if (roomSnap.exists()) {
-      const data = roomSnap.data();
-      const joinLanguage = data?.config?.language || "javascript";
-      const initialCode = getStarterCode(data?.questions?.[0], joinLanguage);
-      if (data.status === "WAITING" && data.player1.uid !== user.uid) {
-        await updateDoc(roomRef, {
-          status: "BATTLE",
-          player2: { uid: user.uid, name: user.displayName || "Hacker 2", code: initialCode, language: joinLanguage },
-          [`scores.${user.uid}`]: 0,
-          updatedAt: serverTimestamp(),
-        });
-        setRoomId(idToJoin);
-        setPlayerRole("player2");
-        setLanguage(joinLanguage);
-        setMyCode(initialCode);
-        setView("BATTLE");
-        listenToRoom(idToJoin, "player2");
-      } else if (data.player1.uid === user.uid) {
-        setRoomId(idToJoin);
-        setPlayerRole("player1");
-        setLanguage(joinLanguage);
-        setView(data.status === "BATTLE" ? "BATTLE" : "WAITING");
-        listenToRoom(idToJoin, "player1");
-      } else if (data.player2?.uid === user.uid) {
-        setRoomId(idToJoin);
-        setPlayerRole("player2");
-        setLanguage(joinLanguage);
-        setView(data.status === "BATTLE" ? "BATTLE" : "WAITING");
-        listenToRoom(idToJoin, "player2");
+      if (!joinedRoom || !role) {
+        throw new Error("Room not found or unavailable.");
       }
-    } else {
-      alert("Room not found or expired.");
+
+      const joinLanguage = joinedRoom?.config?.language || "javascript";
+      const fallbackCode = getStarterCode(joinedRoom?.questions?.[0], joinLanguage);
+      const initialCode =
+        role === "player1"
+          ? joinedRoom?.player1?.code || fallbackCode
+          : joinedRoom?.player2?.code || fallbackCode;
+
+      setRoomId(idToJoin);
+      setRoomData(joinedRoom);
+      setQuestions(joinedRoom?.questions || []);
+      setCurrentQuestionIndex(Number(joinedRoom?.currentQuestionIndex || 0));
+      setPlayerRole(role);
+      setLanguage(joinLanguage);
+      setMyCode(initialCode);
+      setView(joinedRoom?.status === "BATTLE" ? "BATTLE" : "WAITING");
+      listenToRoom(idToJoin, role);
+    } catch (error) {
+      alert(error.message || "Room not found or expired.");
       setView("LOBBY");
     }
   };
@@ -384,7 +382,7 @@ export default function Clash() {
                 </div>
                 <div className="flex gap-2">
                   <input type="text" value={roomId} onChange={(e) => setRoomId(e.target.value.toUpperCase())} placeholder="ENTER ROOM ID" className="flex-1 bg-black border border-[#00ff41]/30 px-4 py-3 text-[#00ff41] placeholder:text-[#00ff41]/30 focus:outline-none focus:border-[#00ff41] focus:shadow-[0_0_15px_rgba(0,255,65,0.3)] transition-all uppercase tracking-widest" />
-                  <button onClick={() => handleJoinRoom(roomId, auth.currentUser)} disabled={!roomId} className="px-6 border border-[#00ff41]/30 hover:bg-[#00ff41]/20 disabled:opacity-50 transition-all font-bold tracking-widest">JOIN</button>
+                  <button onClick={() => handleJoinRoom(roomId)} disabled={!roomId} className="px-6 border border-[#00ff41]/30 hover:bg-[#00ff41]/20 disabled:opacity-50 transition-all font-bold tracking-widest">JOIN</button>
                 </div>
               </div>
             </div>

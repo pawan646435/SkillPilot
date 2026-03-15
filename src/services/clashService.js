@@ -8,6 +8,7 @@ const runClashCodeFn = httpsCallable(functions, "runClashCode");
 const submitClashAnswerFn = httpsCallable(functions, "submitClashAnswer");
 const finalizeClashMatchFn = httpsCallable(functions, "finalizeClashMatch");
 const generateClashQuestionsFn = httpsCallable(functions, "generateClashQuestions");
+const joinClashRoomFn = httpsCallable(functions, "joinClashRoom");
 
 export async function runClashCode(payload) {
   const { data } = await runClashCodeFn(payload);
@@ -27,6 +28,11 @@ export async function finalizeClashMatch(payload) {
 export async function generateClashQuestions(payload) {
   const { data } = await generateClashQuestionsFn(payload);
   return data?.questions || [];
+}
+
+export async function joinClashRoom(payload) {
+  const { data } = await joinClashRoomFn(payload);
+  return data;
 }
 
 export async function fetchClashQuestions({ stack, difficulty, count }) {
