@@ -483,6 +483,8 @@ export default function Jobs() {
                     : "Jobs were freshly synced from JSearch."
                   : dataSource === "stale-cache"
                     ? "Upstream providers were unavailable, so stale cached jobs are being shown."
+                    : dataSource === "provider-unavailable"
+                      ? "The upstream job providers are unavailable right now, so no fresh jobs could be loaded."
                   : "Choose a category to load current listings."}
             </p>
           </div>
