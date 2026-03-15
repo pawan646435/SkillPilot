@@ -31,13 +31,25 @@ export async function getJobsFromProxy(category, region = "global") {
       ? category
       : JOB_CATEGORIES.find((item) => item.id === category) || JOB_CATEGORIES[0];
 
-  const { data } = await fetchJobsProxy({
-    category: selectedCategory.id,
-    role: selectedCategory.role,
-    region,
-  });
+  try {
+    const { data } = await fetchJobsProxy({
+      category: selectedCategory.id,
+      role: selectedCategory.role,
+      region,
+    });
 
-  return data || {};
+    return data || {};
+  } catch (error) {
+    console.error("fetchJobs callable failed:", error);
+    return {
+      category: selectedCategory.id,
+      region,
+      role: selectedCategory.role,
+      jobs: [],
+      fetchedAt: null,
+      source: "provider-unavailable",
+    };
+  }
 }
 
 export async function listSavedJobs(uid) {
