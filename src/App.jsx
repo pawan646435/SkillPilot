@@ -14,6 +14,8 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 // Dashboard Pages
 const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
 const DashboardOverview = lazy(() => import("./pages/dashboard/DashboardOverview"));
+const ClashHistory = lazy(() => import("./pages/dashboard/ClashHistory"));
+const ClashQuestions = lazy(() => import("./pages/dashboard/ClashQuestions"));
 
 // Dashboard Account Page
 const Account = lazy(() => import("./pages/dashboard/Account"));
@@ -108,6 +110,10 @@ function App() {
 
               {/* CANDIDATES */}
               <Route path="candidates" element={<Candidates />} />
+
+              {/* CLASH */}
+              <Route path="clash-history" element={<ClashHistory />} />
+              <Route path="clash-questions" element={<ClashQuestions />} />
 
               {/* ACCOUNT & SETTINGS */}
               <Route path="account" element={<Account />} />

@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useLocation, Link, useNavigate, Outlet } from "react-router-dom";
 import {
   Terminal, LayoutDashboard, FileCode2, Users,
-  Settings, LogOut, Code2, UserCircle, BrainCircuit, Newspaper
+  Settings, LogOut, Code2, UserCircle, BrainCircuit, Newspaper, Swords
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
 import { onAuthStateChanged, signOut } from "firebase/auth";
@@ -27,10 +27,11 @@ export default function DashboardLayout() {
         }
       } else {
         setUser(null);
+        navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`);
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [navigate, location.pathname]);
 
   const getAvatarUrl = () => {
     if (!user?.photoURL) return null;
@@ -44,6 +45,8 @@ export default function DashboardLayout() {
 
   const navLinks = [
     { name: "Overview",    href: "/dashboard",            icon: LayoutDashboard },
+    { name: "Clash History", href: "/dashboard/clash-history", icon: Newspaper },
+    { name: "Clash Questions", href: "/dashboard/clash-questions", icon: Swords },
     { name: "Assessments", href: "/dashboard/assessments", icon: FileCode2 },
     { name: "Problems",    href: "/dashboard/problems",    icon: Code2 },
     { name: "Candidates",  href: "/dashboard/candidates",  icon: Users },

@@ -4,6 +4,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import gsap from "gsap";
+import { onAuthStateChanged } from "firebase/auth";
+import { auth } from "../lib/firebase";
 
 /* ── tiny helpers ── */
 function TypeWriter({ text, speed = 40, delay = 0, className = "" }) {
@@ -129,11 +131,18 @@ function playExitBoom() {
 export default function LandingPage() {
   const[bootDone, setBoot] = useState(false);
   const [exiting, setExiting] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const navigate = useNavigate();
   const exitBtnRef = useRef(null);
   const[exitOrigin, setExitOrigin] = useState({ x: 0, y: 0 });
 
   useEffect(() => { const t = setTimeout(() => setBoot(true), 1800); return () => clearTimeout(t); }, []);
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      setCurrentUser(user || null);
+    });
+    return () => unsub();
+  }, []);
 
   const [exitCountNum, setExitCountNum] = useState(null);
 
@@ -149,9 +158,9 @@ export default function LandingPage() {
     setTimeout(() => { setExitCountNum(1); playExitBeep(); }, 800);
     // Launch sphere
     setTimeout(() => { setExitCountNum(null); setExiting(true); playExitWhoosh(); }, 1200);
-    // Navigate to Login after detonation + fill
-    setTimeout(() => navigate("/login"), 3800);
-  }, [exiting, navigate]);
+    // Navigate after detonation + fill
+    setTimeout(() => navigate(currentUser ? "/" : "/login"), 3800);
+  }, [exiting, navigate, currentUser]);
 
   return (
     <div className="font-mono relative min-h-screen text-[#00ff41] selection:bg-[#00ff41] selection:text-black"
@@ -224,7 +233,7 @@ export default function LandingPage() {
                     <TypeWriter text="./start_clash --mode=ranked" speed={50} delay={2400} />
                   </div>
 
-                  <Link to="/login">
+                  <Link to={currentUser ? "/" : "/login"}>
                     <motion.button
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
@@ -232,7 +241,7 @@ export default function LandingPage() {
                       className="mt-6 px-6 py-3 border border-[#00ff41]/40 text-[#00ff41] rounded-lg font-bold tracking-wider text-sm hover:bg-[#00ff41] hover:text-black transition-all duration-300 shadow-[0_0_20px_rgba(0,255,65,0.15)]"
                       style={{ textShadow: "0 0 10px rgba(0,255,65,0.5)" }}
                     >
-                      [ INITIALIZE SESSION ]
+                      {currentUser ? "[ RETURN HOME ]" : "[ INITIALIZE SESSION ]"}
                     </motion.button>
                   </Link>
                 </motion.div>
@@ -336,9 +345,9 @@ export default function LandingPage() {
         </AnimatePresence>
         <AnimatePresence mode="wait" initial={false}>
           {exitCountNum !== null ? (
-            <motion.span key="ecl" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15, ease:[0.22, 1, 0.36, 1] }} className="text-[#00ff41]/70 tracking-wider">ACCESSING LOGIN...</motion.span>
+            <motion.span key="ecl" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15, ease:[0.22, 1, 0.36, 1] }} className="text-[#00ff41]/70 tracking-wider">{currentUser ? "RETURNING HOME..." : "ACCESSING LOGIN..."}</motion.span>
           ) : (
-            <motion.span key="etxt" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>LOGIN / REGISTER</motion.span>
+            <motion.span key="etxt" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.2, ease: [0.22, 1, 0.36, 1] }}>{currentUser ? "GO TO HOME" : "LOGIN / REGISTER"}</motion.span>
           )}
         </AnimatePresence>
       </motion.button>

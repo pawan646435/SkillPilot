@@ -1,12 +1,13 @@
 // src/pages/Clash.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, Users, Play, Copy, CheckCircle2, Code2, AlertTriangle, Loader2 } from "lucide-react";
+import { Terminal, Users, Play, Copy, CheckCircle2, Code2, AlertTriangle, Loader2, FlaskConical, Send, Trophy } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { auth, db } from "../lib/firebase";
-import { doc, setDoc, getDoc, onSnapshot, updateDoc } from "firebase/firestore";
+import { doc, setDoc, getDoc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { fetchClashQuestions, finalizeClashMatch, runClashCode, submitClashAnswer } from "../services/clashService";
 
 const TerminalText = ({ text, delay = 0 }) => {
   const [displayed, setDisplayed] = useState("");
@@ -28,6 +29,7 @@ export default function Clash() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const roomFromUrl = searchParams.get("room");
+  const syncTimerRef = useRef(null);
 
   const [view, setView] = useState("BOOT"); 
   const [roomId, setRoomId] = useState(roomFromUrl || "");
@@ -36,6 +38,14 @@ export default function Clash() {
   const [myCode, setMyCode] = useState("// Awaiting input...\n");
   const [opponentCode, setOpponentCode] = useState("// Intercepting opponent uplink...\n");
   const [playerRole, setPlayerRole] = useState(null);
+  const [language, setLanguage] = useState("javascript");
+  const [stack, setStack] = useState("DSA");
+  const [difficulty, setDifficulty] = useState("MEDIUM");
+  const [questionCount, setQuestionCount] = useState(1);
+  const [questions, setQuestions] = useState([]);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [runState, setRunState] = useState({ running: false, submitting: false, error: "", output: null });
+  const [finalizedResult, setFinalizedResult] = useState(null);
 
   // ─── 1. BOOT SEQUENCE & AUTH CHECK ───
   useEffect(() => {
@@ -62,20 +72,61 @@ export default function Clash() {
     return () => unsubscribe();
   }, [navigate, roomFromUrl]);
 
+  useEffect(() => {
+    return () => {
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+      }
+    };
+  }, []);
+
+  const currentQuestion = useMemo(() => questions[currentQuestionIndex] || null, [questions, currentQuestionIndex]);
+
   // ─── 2. CREATE A BATTLE ROOM ───
   const handleCreateRoom = async () => {
     const user = auth.currentUser;
+    if (!user) return;
+
+    setRunState((prev) => ({ ...prev, error: "" }));
+    const selectedQuestions = await fetchClashQuestions({ stack, difficulty, count: questionCount });
+    if (!selectedQuestions.length) {
+      setRunState((prev) => ({ ...prev, error: "No clash questions found for selected filters." }));
+      return;
+    }
+
     const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
     const roomRef = doc(db, "battles", newRoomId);
     
     await setDoc(roomRef, {
       status: "WAITING",
-      player1: { uid: user.uid, name: user.displayName || "Hacker 1", code: "// Ready\n" },
+      mode: "PRACTICAL",
+      config: {
+        stack,
+        difficulty,
+        questionCount: selectedQuestions.length,
+        language,
+      },
+      questions: selectedQuestions.map((q) => ({
+        id: q.id,
+        title: q.title || "Untitled",
+        description: q.description || "",
+        difficulty: q.difficulty || difficulty,
+        tags: q.tags || [],
+      })),
+      currentQuestionIndex: 0,
+      scores: { [user.uid]: 0 },
+      submissions: {},
+      player1: { uid: user.uid, name: user.displayName || "Hacker 1", code: "function solution() {\n  return null;\n}\n", language },
       player2: null,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
     });
 
     setRoomId(newRoomId);
     setPlayerRole("player1");
+    setQuestions(selectedQuestions);
+    setCurrentQuestionIndex(0);
+    setMyCode("function solution() {\n  return null;\n}\n");
     setView("WAITING");
     listenToRoom(newRoomId, "player1");
   };
@@ -90,17 +141,27 @@ export default function Clash() {
       if (data.status === "WAITING" && data.player1.uid !== user.uid) {
         await updateDoc(roomRef, {
           status: "BATTLE",
-          player2: { uid: user.uid, name: user.displayName || "Hacker 2", code: "// Ready\n" }
+          player2: { uid: user.uid, name: user.displayName || "Hacker 2", code: "function solution() {\n  return null;\n}\n", language: data?.config?.language || "javascript" },
+          [`scores.${user.uid}`]: 0,
+          updatedAt: serverTimestamp(),
         });
         setRoomId(idToJoin);
         setPlayerRole("player2");
+        setLanguage(data?.config?.language || "javascript");
         setView("BATTLE");
         listenToRoom(idToJoin, "player2");
       } else if (data.player1.uid === user.uid) {
         setRoomId(idToJoin);
         setPlayerRole("player1");
+        setLanguage(data?.config?.language || "javascript");
         setView(data.status === "BATTLE" ? "BATTLE" : "WAITING");
         listenToRoom(idToJoin, "player1");
+      } else if (data.player2?.uid === user.uid) {
+        setRoomId(idToJoin);
+        setPlayerRole("player2");
+        setLanguage(data?.config?.language || "javascript");
+        setView(data.status === "BATTLE" ? "BATTLE" : "WAITING");
+        listenToRoom(idToJoin, "player2");
       }
     } else {
       alert("Room not found or expired.");
@@ -115,24 +176,85 @@ export default function Clash() {
       if (!docSnap.exists()) return;
       const data = docSnap.data();
       setRoomData(data);
+      setQuestions(data?.questions || []);
+      setCurrentQuestionIndex(Number(data?.currentQuestionIndex || 0));
       
       if (data.status === "BATTLE" && view !== "BATTLE") {
         setView("BATTLE");
       }
 
+      if (data.status === "FINISHED") {
+        setFinalizedResult(data.result || null);
+      }
+
       if (role === "player1" && data.player2) {
         setOpponentCode(data.player2.code);
+        setMyCode(data.player1?.code || myCode);
       } else if (role === "player2" && data.player1) {
         setOpponentCode(data.player1.code);
+        setMyCode(data.player2?.code || myCode);
       }
+
+      setLanguage(data?.config?.language || "javascript");
     });
   };
 
   const handleCodeChange = async (newCode) => {
     setMyCode(newCode);
     if (roomId && playerRole) {
-      const roomRef = doc(db, "battles", roomId);
-      await updateDoc(roomRef, { [`${playerRole}.code`]: newCode });
+      if (syncTimerRef.current) {
+        clearTimeout(syncTimerRef.current);
+      }
+
+      syncTimerRef.current = setTimeout(async () => {
+        const roomRef = doc(db, "battles", roomId);
+        await updateDoc(roomRef, { [`${playerRole}.code`]: newCode, updatedAt: serverTimestamp() });
+      }, 300);
+    }
+  };
+
+  const runCurrentCode = async () => {
+    if (!roomId || !currentQuestion?.id) return;
+
+    setRunState({ running: true, submitting: false, error: "", output: null });
+    try {
+      const response = await runClashCode({
+        roomId,
+        questionId: currentQuestion.id,
+        code: myCode,
+        language,
+      });
+      setRunState({ running: false, submitting: false, error: "", output: response?.result || null });
+    } catch (error) {
+      setRunState({ running: false, submitting: false, error: error.message || "Run failed", output: null });
+    }
+  };
+
+  const submitCurrentCode = async () => {
+    if (!roomId || !currentQuestion?.id) return;
+
+    setRunState({ running: false, submitting: true, error: "", output: null });
+    try {
+      const response = await submitClashAnswer({
+        roomId,
+        questionId: currentQuestion.id,
+        code: myCode,
+        language,
+      });
+      setRunState({ running: false, submitting: false, error: "", output: response?.result || null });
+    } catch (error) {
+      setRunState({ running: false, submitting: false, error: error.message || "Submit failed", output: null });
+    }
+  };
+
+  const finalizeBattle = async () => {
+    if (!roomId) return;
+    setRunState((prev) => ({ ...prev, error: "" }));
+    try {
+      const result = await finalizeClashMatch({ roomId });
+      setFinalizedResult(result);
+    } catch (error) {
+      setRunState((prev) => ({ ...prev, error: error.message || "Could not finalize battle" }));
     }
   };
 
@@ -172,10 +294,28 @@ export default function Clash() {
               </div>
               <h2 className="text-3xl font-bold text-center mb-8 tracking-widest uppercase drop-shadow-[0_0_10px_rgba(0,255,65,0.8)]">Arena Terminal</h2>
               <div className="space-y-6">
+                <div className="grid grid-cols-2 gap-2">
+                  <select value={stack} onChange={(e) => setStack(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                    <option value="DSA">DSA</option>
+                    <option value="JAVASCRIPT">JAVASCRIPT</option>
+                    <option value="PYTHON">PYTHON</option>
+                  </select>
+                  <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                    <option value="EASY">EASY</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="HARD">HARD</option>
+                  </select>
+                  <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                    <option value="javascript">JAVASCRIPT</option>
+                    <option value="python">PYTHON</option>
+                  </select>
+                  <input type="number" min={1} max={5} value={questionCount} onChange={(e) => setQuestionCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase" placeholder="Q COUNT" />
+                </div>
                 <button onClick={handleCreateRoom} className="w-full py-4 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest flex items-center justify-center gap-3 group shadow-[0_0_15px_rgba(0,255,65,0.2)]">
                   <Terminal className="w-5 h-5" />
                   [ GENERATE NEW BATTLE ]
                 </button>
+                {runState.error && <p className="text-xs text-rose-400">{runState.error}</p>}
                 <div className="flex items-center gap-4 opacity-50">
                   <div className="flex-1 h-px bg-[#00ff41]/50" />
                   <span className="text-xs tracking-widest uppercase">or</span>
@@ -219,8 +359,29 @@ export default function Clash() {
                 <span className="font-bold tracking-widest uppercase text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]">Live Clash</span>
               </div>
               <div className="text-2xl font-black tracking-widest drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]">ROOM: {roomId}</div>
-              <button onClick={() => navigate("/dashboard")} className="text-xs border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41]/20 uppercase tracking-widest">Abort</button>
+              <div className="flex items-center gap-2">
+                <button onClick={finalizeBattle} className="text-xs border border-amber-400/50 text-amber-300 px-3 py-1 hover:bg-amber-400/20 uppercase tracking-widest">Finalize</button>
+                <button onClick={() => navigate("/dashboard")} className="text-xs border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41]/20 uppercase tracking-widest">Abort</button>
+              </div>
             </header>
+
+            <div className="h-28 border-b border-[#00ff41]/20 bg-black/70 px-4 py-2 overflow-x-auto">
+              <div className="flex items-center gap-2 mb-2 text-xs uppercase tracking-widest text-[#00ff41]/70">
+                <Trophy className="w-3.5 h-3.5" />
+                Practical Clash • {roomData?.config?.stack || stack} • {roomData?.config?.difficulty || difficulty}
+              </div>
+              <div className="flex gap-2">
+                {questions.map((q, idx) => (
+                  <button
+                    key={q.id || idx}
+                    onClick={() => setCurrentQuestionIndex(idx)}
+                    className={`px-3 py-2 text-xs border rounded ${idx === currentQuestionIndex ? "border-[#00ff41] bg-[#00ff41]/10" : "border-[#00ff41]/30"}`}
+                  >
+                    Q{idx + 1} • {q.title || "Untitled"}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             <div className="flex flex-1 overflow-hidden">
               {/* My Editor */}
@@ -230,7 +391,7 @@ export default function Clash() {
                   <span className="text-xs text-[#00ff41]/50">{auth.currentUser?.displayName || "Player 1"}</span>
                 </div>
                 <div className="flex-1 relative bg-[#050505]">
-                  <Editor height="100%" language="javascript" theme="vs-dark" value={myCode} onChange={handleCodeChange} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 } }} />
+                  <Editor height="100%" language={language} theme="vs-dark" value={myCode} onChange={(v) => handleCodeChange(v || "")} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 } }} />
                 </div>
               </div>
 
@@ -239,10 +400,57 @@ export default function Clash() {
                 <div className="absolute inset-0 z-10 bg-rose-900/5 mix-blend-overlay" />
                 <div className="h-10 bg-black/80 border-b border-[#00ff41]/20 flex items-center px-4 justify-between">
                   <span className="text-xs font-bold tracking-widest uppercase text-rose-500 flex items-center gap-2 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" /> Network Intercept</span>
-                  <span className="text-xs text-rose-500/50">Opponent</span>
+                  <span className="text-xs text-rose-500/50">{roomData?.player2?.name && playerRole === "player1" ? roomData.player2.name : roomData?.player1?.name && playerRole === "player2" ? roomData.player1.name : "Opponent"}</span>
                 </div>
                 <div className="flex-1 relative bg-[#050505]">
-                  <Editor height="100%" language="javascript" theme="vs-dark" value={opponentCode} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 }, readOnly: true }} />
+                  <Editor height="100%" language={language} theme="vs-dark" value={opponentCode} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 }, readOnly: true }} />
+                </div>
+              </div>
+            </div>
+
+            <div className="h-56 border-t border-[#00ff41]/20 bg-black/90 p-4 overflow-auto">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+                <div className="md:col-span-2 border border-[#00ff41]/20 rounded p-3 overflow-auto">
+                  <div className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-2">Current Question</div>
+                  <h3 className="text-sm font-bold mb-2">{currentQuestion?.title || "No question selected"}</h3>
+                  <p className="text-xs text-[#00ff41]/70 whitespace-pre-wrap">{currentQuestion?.description || "Choose a clash format and start a room."}</p>
+                </div>
+                <div className="border border-[#00ff41]/20 rounded p-3 flex flex-col">
+                  <div className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-2">Execute</div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={runCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion} className="py-2 border border-cyan-400/50 text-cyan-300 text-xs uppercase tracking-widest hover:bg-cyan-400/20 disabled:opacity-50 flex items-center justify-center gap-1">
+                      <FlaskConical className="w-3.5 h-3.5" />
+                      {runState.running ? "Running..." : "Run Code"}
+                    </button>
+                    <button onClick={submitCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion} className="py-2 border border-[#00ff41]/50 text-[#00ff41] text-xs uppercase tracking-widest hover:bg-[#00ff41]/20 disabled:opacity-50 flex items-center justify-center gap-1">
+                      <Send className="w-3.5 h-3.5" />
+                      {runState.submitting ? "Submitting..." : "Submit"}
+                    </button>
+                  </div>
+                  <div className="mt-2 text-[11px] text-[#00ff41]/60">
+                    My Score: {roomData?.scores?.[auth.currentUser?.uid] || 0}
+                  </div>
+                  <div className="text-[11px] text-rose-300/70 mb-2">
+                    Opponent Score: {playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}
+                  </div>
+                  <div className="text-[11px] text-neutral-300/80 flex-1 overflow-auto border border-white/10 rounded p-2">
+                    {runState.error && <p className="text-rose-400">{runState.error}</p>}
+                    {!runState.error && !runState.output && <p className="text-[#00ff41]/40">Run or submit to view test results.</p>}
+                    {runState.output && (
+                      <div className="space-y-1">
+                        <p>Passed: {runState.output.passed}/{runState.output.total}</p>
+                        <p>Elapsed: {runState.output.elapsedMs} ms</p>
+                        <p>Points: {runState.output.points}</p>
+                      </div>
+                    )}
+                    {finalizedResult && (
+                      <div className="mt-2 border-t border-white/10 pt-2 text-amber-300">
+                        <p>Finalized</p>
+                        <p>P1: {finalizedResult.player1Score || 0}</p>
+                        <p>P2: {finalizedResult.player2Score || 0}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
