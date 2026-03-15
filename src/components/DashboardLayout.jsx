@@ -15,6 +15,7 @@ export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
@@ -29,6 +30,7 @@ export default function DashboardLayout() {
         setUser(null);
         navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`);
       }
+      setAuthReady(true);
     });
     return () => unsubscribe();
   }, [navigate, location.pathname]);
@@ -162,7 +164,7 @@ export default function DashboardLayout() {
       {/* Main Content */}
       <main className="relative z-10 flex-1 md:ml-64">
         <div className="p-8 mx-auto md:p-12 max-w-7xl">
-          <Outlet />
+          <Outlet context={{ dashboardUser: user, dashboardAuthReady: authReady }} />
         </div>
       </main>
     </div>

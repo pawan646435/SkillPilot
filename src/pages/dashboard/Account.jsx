@@ -2,12 +2,14 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { User, Mail, Phone, FileText, Camera, Shield, Key, Check, X, Loader2, Eye, EyeOff, Calendar, BadgeCheck, AlertCircle } from "lucide-react";
+import { useOutletContext } from "react-router-dom";
 import { auth, db, storage } from "../../lib/firebase";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { updateProfile, updatePassword, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 export default function Account() {
+  const { dashboardUser, dashboardAuthReady } = useOutletContext();
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -27,22 +29,23 @@ export default function Account() {
   const [pwChanging, setPwChanging] = useState(false);
 
   useEffect(() => {
-    const fetchProfile = async () => {
-      const currentUser = auth.currentUser;
-      if (currentUser) {
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        const userData = userDoc.exists() ? userDoc.data() : {};
-        setUser({ ...currentUser, ...userData, role: userData.role || "USER", createdAt: userData.createdAt });
-        setProfileForm({
-          name: userData.name || currentUser.displayName || "",
-          phone: userData.phone || "",
-          bio: userData.bio || "",
-        });
-      }
-      setLoading(false);
-    };
-    fetchProfile();
-  },[]);
+    if (!dashboardAuthReady) {
+      return;
+    }
+
+    if (dashboardUser) {
+      setUser(dashboardUser);
+      setProfileForm({
+        name: dashboardUser.name || dashboardUser.displayName || "",
+        phone: dashboardUser.phone || "",
+        bio: dashboardUser.bio || "",
+      });
+    } else {
+      setUser(null);
+    }
+
+    setLoading(false);
+  }, [dashboardUser, dashboardAuthReady]);
 
   const getDisplayName = () => {
     return user?.name || user?.displayName || user?.email?.split("@")[0] || "User";
