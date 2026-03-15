@@ -38,6 +38,74 @@ function mapRoomQuestion(question, fallbackDifficulty) {
   };
 }
 
+function formatTerminalValue(value) {
+  if (typeof value === "string") return value;
+
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+const OutputTerminal = ({ runState, finalizedResult }) => {
+  const visibleCases = runState.output?.cases?.filter((item) => !item.hidden) || [];
+  const hiddenCaseCount = runState.output?.cases?.filter((item) => item.hidden).length || 0;
+
+  return (
+    <div className="flex h-[220px] flex-col overflow-hidden rounded-xl border border-cyan-400/20 bg-[#020706] shadow-[0_0_20px_rgba(6,182,212,0.08)]">
+      <div className="flex items-center justify-between border-b border-cyan-400/20 bg-cyan-400/5 px-4 py-2 text-[11px] uppercase tracking-[0.25em] text-cyan-300">
+        <span className="flex items-center gap-2">
+          <div className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(103,232,249,0.9)]" />
+          Output Terminal
+        </span>
+        <span className="text-cyan-200/50">sandbox://stdout</span>
+      </div>
+
+      <div className="flex-1 space-y-2 overflow-auto px-4 py-3 text-[11px] leading-6 text-cyan-50/90">
+        {runState.running && <p className="text-cyan-300">{">"} running local test harness...</p>}
+        {runState.submitting && <p className="text-[#00ff41]">{">"} submitting solution to arena...</p>}
+        {runState.error && <p className="text-rose-400">[error] {runState.error}</p>}
+
+        {!runState.error && !runState.running && !runState.submitting && !runState.output && (
+          <p className="text-cyan-100/35">{">"} run code or submit to inspect output...</p>
+        )}
+
+        {runState.output && (
+          <>
+            <p className="text-[#00ff41]">
+              {">"} passed {runState.output.passed}/{runState.output.total} tests | elapsed {runState.output.elapsedMs} ms | points {runState.output.points}
+            </p>
+
+            {visibleCases.map((item) => (
+              <div key={`case-${item.index}`} className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
+                <p className={item.passed ? "text-emerald-300" : "text-rose-300"}>
+                  [{item.passed ? "PASS" : "FAIL"}] case {item.index + 1}
+                </p>
+                {"expected" in item && <p className="text-cyan-100/70">expected: {formatTerminalValue(item.expected)}</p>}
+                {"output" in item && <p className="text-cyan-100/70">output: {formatTerminalValue(item.output)}</p>}
+                {item.error && <p className="text-rose-300">error: {item.error}</p>}
+              </div>
+            ))}
+
+            {hiddenCaseCount > 0 && (
+              <p className="text-cyan-100/45">{">"} hidden test cases evaluated server-side: {hiddenCaseCount}</p>
+            )}
+          </>
+        )}
+
+        {finalizedResult && (
+          <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-amber-200">
+            <p>{">"} match finalized</p>
+            <p>player 1: {finalizedResult.player1Score || 0}</p>
+            <p>player 2: {finalizedResult.player2Score || 0}</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const TerminalText = ({ text, delay = 0 }) => {
   const [displayed, setDisplayed] = useState("");
   useEffect(() => {
@@ -442,33 +510,45 @@ export default function Clash() {
               </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden">
-              {/* My Editor */}
-              <div className="flex-1 flex flex-col border-r border-[#00ff41]/20 relative">
+            <div className="flex flex-1 flex-col overflow-hidden xl:flex-row">
+              {/* My Editor + Output */}
+              <div className="flex min-h-0 flex-[1.2] flex-col border-r border-[#00ff41]/20 relative">
                 <div className="h-10 bg-black/80 border-b border-[#00ff41]/20 flex items-center px-4 justify-between">
                   <span className="flex items-center gap-2 text-xs font-bold tracking-widest uppercase"><div className="w-2 h-2 rounded-full bg-[#00ff41] animate-pulse" /> Local Terminal</span>
                   <span className="text-xs text-[#00ff41]/50">{auth.currentUser?.displayName || "Player 1"}</span>
                 </div>
-                <div className="flex-1 relative bg-[#050505]">
+                <div className="min-h-0 flex-1 relative bg-[#050505]">
                   <Editor height="100%" language={language} theme="vs-dark" value={myCode} onChange={(v) => handleCodeChange(v || "")} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 } }} />
+                </div>
+                <div className="border-t border-cyan-400/20 bg-black/95 p-4">
+                  <OutputTerminal runState={runState} finalizedResult={finalizedResult} />
                 </div>
               </div>
 
-              {/* Opponent Editor */}
-              <div className="relative flex flex-col flex-1 pointer-events-none opacity-80">
-                <div className="absolute inset-0 z-10 bg-rose-900/5 mix-blend-overlay" />
+              {/* Opponent Preview */}
+              <div className="relative flex min-h-[260px] w-full flex-col overflow-hidden border-t border-[#00ff41]/20 bg-black/75 xl:min-h-0 xl:w-[340px] xl:max-w-[340px] xl:border-l xl:border-t-0">
                 <div className="h-10 bg-black/80 border-b border-[#00ff41]/20 flex items-center px-4 justify-between">
                   <span className="text-xs font-bold tracking-widest uppercase text-rose-500 flex items-center gap-2 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" /> Network Intercept</span>
                   <span className="text-xs text-rose-500/50">{roomData?.player2?.name && playerRole === "player1" ? roomData.player2.name : roomData?.player1?.name && playerRole === "player2" ? roomData.player1.name : "Opponent"}</span>
                 </div>
-                <div className="flex-1 relative bg-[#050505]">
-                  <Editor height="100%" language={language} theme="vs-dark" value={opponentCode} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 }, readOnly: true }} />
+                <div className="relative min-h-0 flex-1 overflow-hidden bg-[#050505]">
+                  <div className="absolute inset-0 z-20 bg-[radial-gradient(circle_at_top,_rgba(244,63,94,0.12),_transparent_55%)]" />
+                  <div className="absolute right-3 top-3 z-30 rounded-full border border-rose-400/20 bg-black/60 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-rose-200/80 backdrop-blur-md">
+                    Obfuscated Feed
+                  </div>
+                  <div className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[3px]" />
+                  <div className="absolute inset-0 scale-[1.02] opacity-75 blur-[7px]">
+                    <Editor height="100%" language={language} theme="vs-dark" value={opponentCode} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 14, padding: { top: 16 }, readOnly: true }} />
+                  </div>
+                </div>
+                <div className="border-t border-rose-400/15 bg-rose-500/5 px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-rose-200/55">
+                  opponent source blurred for practical mode
                 </div>
               </div>
             </div>
 
-            <div className="h-56 border-t border-[#00ff41]/20 bg-black/90 p-4 overflow-auto">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full">
+            <div className="border-t border-[#00ff41]/20 bg-black/90 p-4 overflow-auto">
+              <div className="grid min-h-[220px] grid-cols-1 gap-4 md:grid-cols-3">
                 <div className="md:col-span-2 border border-[#00ff41]/20 rounded p-3 overflow-auto">
                   <div className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-2">Current Question</div>
                   <h3 className="text-sm font-bold mb-2">{currentQuestion?.title || "No question selected"}</h3>
@@ -492,23 +572,8 @@ export default function Clash() {
                   <div className="text-[11px] text-rose-300/70 mb-2">
                     Opponent Score: {playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}
                   </div>
-                  <div className="text-[11px] text-neutral-300/80 flex-1 overflow-auto border border-white/10 rounded p-2">
-                    {runState.error && <p className="text-rose-400">{runState.error}</p>}
-                    {!runState.error && !runState.output && <p className="text-[#00ff41]/40">Run or submit to view test results.</p>}
-                    {runState.output && (
-                      <div className="space-y-1">
-                        <p>Passed: {runState.output.passed}/{runState.output.total}</p>
-                        <p>Elapsed: {runState.output.elapsedMs} ms</p>
-                        <p>Points: {runState.output.points}</p>
-                      </div>
-                    )}
-                    {finalizedResult && (
-                      <div className="mt-2 border-t border-white/10 pt-2 text-amber-300">
-                        <p>Finalized</p>
-                        <p>P1: {finalizedResult.player1Score || 0}</p>
-                        <p>P2: {finalizedResult.player2Score || 0}</p>
-                      </div>
-                    )}
+                  <div className="mt-auto text-[11px] text-neutral-300/50 border border-white/10 rounded p-3">
+                    Results stream in the output terminal beside your editor.
                   </div>
                 </div>
               </div>
