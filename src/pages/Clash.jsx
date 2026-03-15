@@ -7,7 +7,36 @@ import Editor from "@monaco-editor/react";
 import { auth, db } from "../lib/firebase";
 import { doc, setDoc, getDoc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
-import { fetchClashQuestions, finalizeClashMatch, runClashCode, submitClashAnswer } from "../services/clashService";
+import { fetchClashQuestions, finalizeClashMatch, generateClashQuestions, runClashCode, submitClashAnswer } from "../services/clashService";
+
+const DEFAULT_CODE_BY_LANGUAGE = {
+  javascript: `function solution(...args) {
+  return null;
+}
+`,
+  python: `def solution(*args):
+    return None
+`,
+};
+
+function getStarterCode(question, language) {
+  const starterCode = question?.starterCode;
+  if (starterCode && typeof starterCode === "object" && typeof starterCode[language] === "string" && starterCode[language].trim()) {
+    return starterCode[language];
+  }
+  return DEFAULT_CODE_BY_LANGUAGE[language] || DEFAULT_CODE_BY_LANGUAGE.javascript;
+}
+
+function mapRoomQuestion(question, fallbackDifficulty) {
+  return {
+    id: question.id,
+    title: question.title || "Untitled",
+    description: question.description || "",
+    difficulty: question.difficulty || fallbackDifficulty,
+    tags: question.tags || [],
+    starterCode: question.starterCode || {},
+  };
+}
 
 const TerminalText = ({ text, delay = 0 }) => {
   const [displayed, setDisplayed] = useState("");
@@ -46,6 +75,7 @@ export default function Clash() {
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [runState, setRunState] = useState({ running: false, submitting: false, error: "", output: null });
   const [finalizedResult, setFinalizedResult] = useState(null);
+  const [creatingBattle, setCreatingBattle] = useState(false);
 
   // ─── 1. BOOT SEQUENCE & AUTH CHECK ───
   useEffect(() => {
@@ -85,50 +115,63 @@ export default function Clash() {
   // ─── 2. CREATE A BATTLE ROOM ───
   const handleCreateRoom = async () => {
     const user = auth.currentUser;
-    if (!user) return;
+    if (!user || creatingBattle) return;
 
+    setCreatingBattle(true);
     setRunState((prev) => ({ ...prev, error: "" }));
-    const selectedQuestions = await fetchClashQuestions({ stack, difficulty, count: questionCount });
-    if (!selectedQuestions.length) {
-      setRunState((prev) => ({ ...prev, error: "No clash questions found for selected filters." }));
-      return;
+
+    try {
+      const existingQuestions = await fetchClashQuestions({ stack, difficulty, count: questionCount });
+      const missingCount = Math.max(0, questionCount - existingQuestions.length);
+
+      const generatedQuestions =
+        missingCount > 0
+          ? await generateClashQuestions({ stack, difficulty, language, count: missingCount })
+          : [];
+
+      const selectedQuestions = [...existingQuestions, ...generatedQuestions].slice(0, questionCount);
+
+      if (!selectedQuestions.length) {
+        setRunState((prev) => ({ ...prev, error: "Could not load or generate clash questions for selected filters." }));
+        return;
+      }
+
+      const roomQuestions = selectedQuestions.map((question) => mapRoomQuestion(question, difficulty));
+      const initialCode = getStarterCode(roomQuestions[0], language);
+      const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
+      const roomRef = doc(db, "battles", newRoomId);
+
+      await setDoc(roomRef, {
+        status: "WAITING",
+        mode: "PRACTICAL",
+        config: {
+          stack,
+          difficulty,
+          questionCount: roomQuestions.length,
+          language,
+        },
+        questions: roomQuestions,
+        currentQuestionIndex: 0,
+        scores: { [user.uid]: 0 },
+        submissions: {},
+        player1: { uid: user.uid, name: user.displayName || "Hacker 1", code: initialCode, language },
+        player2: null,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+
+      setRoomId(newRoomId);
+      setPlayerRole("player1");
+      setQuestions(roomQuestions);
+      setCurrentQuestionIndex(0);
+      setMyCode(initialCode);
+      setView("WAITING");
+      listenToRoom(newRoomId, "player1");
+    } catch (error) {
+      setRunState((prev) => ({ ...prev, error: error.message || "Could not create battle." }));
+    } finally {
+      setCreatingBattle(false);
     }
-
-    const newRoomId = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const roomRef = doc(db, "battles", newRoomId);
-    
-    await setDoc(roomRef, {
-      status: "WAITING",
-      mode: "PRACTICAL",
-      config: {
-        stack,
-        difficulty,
-        questionCount: selectedQuestions.length,
-        language,
-      },
-      questions: selectedQuestions.map((q) => ({
-        id: q.id,
-        title: q.title || "Untitled",
-        description: q.description || "",
-        difficulty: q.difficulty || difficulty,
-        tags: q.tags || [],
-      })),
-      currentQuestionIndex: 0,
-      scores: { [user.uid]: 0 },
-      submissions: {},
-      player1: { uid: user.uid, name: user.displayName || "Hacker 1", code: "function solution() {\n  return null;\n}\n", language },
-      player2: null,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-
-    setRoomId(newRoomId);
-    setPlayerRole("player1");
-    setQuestions(selectedQuestions);
-    setCurrentQuestionIndex(0);
-    setMyCode("function solution() {\n  return null;\n}\n");
-    setView("WAITING");
-    listenToRoom(newRoomId, "player1");
   };
 
   // ─── 3. JOIN A BATTLE ROOM ───
@@ -138,28 +181,31 @@ export default function Clash() {
 
     if (roomSnap.exists()) {
       const data = roomSnap.data();
+      const joinLanguage = data?.config?.language || "javascript";
+      const initialCode = getStarterCode(data?.questions?.[0], joinLanguage);
       if (data.status === "WAITING" && data.player1.uid !== user.uid) {
         await updateDoc(roomRef, {
           status: "BATTLE",
-          player2: { uid: user.uid, name: user.displayName || "Hacker 2", code: "function solution() {\n  return null;\n}\n", language: data?.config?.language || "javascript" },
+          player2: { uid: user.uid, name: user.displayName || "Hacker 2", code: initialCode, language: joinLanguage },
           [`scores.${user.uid}`]: 0,
           updatedAt: serverTimestamp(),
         });
         setRoomId(idToJoin);
         setPlayerRole("player2");
-        setLanguage(data?.config?.language || "javascript");
+        setLanguage(joinLanguage);
+        setMyCode(initialCode);
         setView("BATTLE");
         listenToRoom(idToJoin, "player2");
       } else if (data.player1.uid === user.uid) {
         setRoomId(idToJoin);
         setPlayerRole("player1");
-        setLanguage(data?.config?.language || "javascript");
+        setLanguage(joinLanguage);
         setView(data.status === "BATTLE" ? "BATTLE" : "WAITING");
         listenToRoom(idToJoin, "player1");
       } else if (data.player2?.uid === user.uid) {
         setRoomId(idToJoin);
         setPlayerRole("player2");
-        setLanguage(data?.config?.language || "javascript");
+        setLanguage(joinLanguage);
         setView(data.status === "BATTLE" ? "BATTLE" : "WAITING");
         listenToRoom(idToJoin, "player2");
       }
@@ -311,9 +357,9 @@ export default function Clash() {
                   </select>
                   <input type="number" min={1} max={5} value={questionCount} onChange={(e) => setQuestionCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase" placeholder="Q COUNT" />
                 </div>
-                <button onClick={handleCreateRoom} className="w-full py-4 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest flex items-center justify-center gap-3 group shadow-[0_0_15px_rgba(0,255,65,0.2)]">
+                <button onClick={handleCreateRoom} disabled={creatingBattle} className="w-full py-4 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest flex items-center justify-center gap-3 group shadow-[0_0_15px_rgba(0,255,65,0.2)] disabled:opacity-60 disabled:hover:bg-[#00ff41]/10 disabled:hover:text-[#00ff41]">
                   <Terminal className="w-5 h-5" />
-                  [ GENERATE NEW BATTLE ]
+                  {creatingBattle ? "[ GENERATING BATTLE... ]" : "[ GENERATE NEW BATTLE ]"}
                 </button>
                 {runState.error && <p className="text-xs text-rose-400">{runState.error}</p>}
                 <div className="flex items-center gap-4 opacity-50">

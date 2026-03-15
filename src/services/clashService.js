@@ -7,6 +7,7 @@ const functions = getFunctions(app, "asia-south1");
 const runClashCodeFn = httpsCallable(functions, "runClashCode");
 const submitClashAnswerFn = httpsCallable(functions, "submitClashAnswer");
 const finalizeClashMatchFn = httpsCallable(functions, "finalizeClashMatch");
+const generateClashQuestionsFn = httpsCallable(functions, "generateClashQuestions");
 
 export async function runClashCode(payload) {
   const { data } = await runClashCodeFn(payload);
@@ -21,6 +22,11 @@ export async function submitClashAnswer(payload) {
 export async function finalizeClashMatch(payload) {
   const { data } = await finalizeClashMatchFn(payload);
   return data;
+}
+
+export async function generateClashQuestions(payload) {
+  const { data } = await generateClashQuestionsFn(payload);
+  return data?.questions || [];
 }
 
 export async function fetchClashQuestions({ stack, difficulty, count }) {
