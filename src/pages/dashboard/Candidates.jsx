@@ -2,12 +2,11 @@
 import { motion } from "framer-motion";
 import { User, Search, Filter, Play, CheckCircle2, XCircle, Clock } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { collection, getDocs } from "firebase/firestore";
 
 export default function Candidates() {
-  const navigate = useNavigate();
   const [candidates, setCandidates] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");

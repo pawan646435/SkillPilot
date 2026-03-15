@@ -2,7 +2,7 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Trophy, Medal, BarChart3, Loader2, ChevronRight, User } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 
@@ -13,7 +13,6 @@ const rankColors = {
 };
 
 export default function AssessmentResults() {
-  const navigate = useNavigate();
   const { id } = useParams();
   const [assessment, setAssessment] = useState(null);
   const [leaderboard, setLeaderboard] = useState([]);

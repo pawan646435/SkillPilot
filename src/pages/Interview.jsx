@@ -13,7 +13,7 @@ export default function Interview() {
   const [isRunning, setIsRunning] = useState(false);
   const [messages, setMessages] = useState([]);
   const [chatInput, setChatInput] = useState("");
-  const [isAITyping, setIsAITyping] = useState(false);
+  const [isAITyping, setIsAITyping] = useState(true);
   const[seconds, setSeconds] = useState(0);
 
   // Timer Tick
@@ -37,11 +37,11 @@ export default function Interview() {
 
   // AI Greeting
   useEffect(() => {
-    setIsAITyping(true);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       setMessages([{ role: "ai", content: "Initializing neural connection... Welcome to SkillPilot. I am your AI Interviewer. Please review the problem statement and let me know your approach before writing code." }]);
       setIsAITyping(false);
     }, 2000);
+    return () => clearTimeout(timer);
   },[]);
 
   const handleRunCode = async () => {

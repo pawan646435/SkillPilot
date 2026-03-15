@@ -1,7 +1,7 @@
 // src/pages/InviteVerify.jsx
 import { motion } from "framer-motion";
 import { Clock, Code2, AlertCircle, Loader2, ArrowRight, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { db, auth } from "../lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
@@ -16,21 +16,7 @@ export default function InviteVerify() {
   const [invite, setInvite] = useState(null);
   const [errorMsg, setErrorMsg] = useState("");
 
-  useEffect(() => {
-    // 1. Ensure the user is logged in before they can view the invite
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        // Redirect to login, but remember where to send them back!
-        navigate(`/login?redirect=${encodeURIComponent(`/assessment/invite/${token}`)}`);
-        return;
-      }
-      verifyInviteToken(user);
-    });
-
-    return () => unsubscribe();
-  }, [token, navigate]);
-
-  const verifyInviteToken = async (user) => {
+  const verifyInviteToken = useCallback(async () => {
     try {
       // 2. Look up the invite by its unique token
       const q = query(collection(db, "invites"), where("token", "==", token));
@@ -71,7 +57,21 @@ export default function InviteVerify() {
       setStatus("error");
       setErrorMsg("Network error. Please try again.");
     }
-  };
+  }, [token]);
+
+  useEffect(() => {
+    // 1. Ensure the user is logged in before they can view the invite
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        // Redirect to login, but remember where to send them back!
+        navigate(`/login?redirect=${encodeURIComponent(`/assessment/invite/${token}`)}`);
+        return;
+      }
+      verifyInviteToken();
+    });
+
+    return () => unsubscribe();
+  }, [token, navigate, verifyInviteToken]);
 
   const handleStart = async () => {
     // Mark the invite as ACCEPTED if they are starting the test

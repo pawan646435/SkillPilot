@@ -39,7 +39,7 @@ export default function EditProblem() {
         } else {
           setError("Problem not found");
         }
-      } catch (err) {
+      } catch (_err) {
         setError("Failed to load problem");
       } finally {
         setLoading(false);

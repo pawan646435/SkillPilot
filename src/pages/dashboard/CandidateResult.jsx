@@ -2,12 +2,11 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, User, Clock, Code2, CheckCircle2, Loader2, BarChart3 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
 export default function CandidateResult() {
-  const navigate = useNavigate();
   const { id: assessmentId, candidateId } = useParams();
   
   const [candidate, setCandidate] = useState(null);
