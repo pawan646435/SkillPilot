@@ -42,14 +42,21 @@ const TerminalText = ({ text, delay = 0 }) => {
   const [displayed, setDisplayed] = useState("");
   useEffect(() => {
     let i = 0;
-    setTimeout(() => {
-      const interval = setInterval(() => {
+    let intervalId = null;
+    const timeoutId = setTimeout(() => {
+      intervalId = setInterval(() => {
         setDisplayed(text.slice(0, i + 1));
         i++;
-        if (i >= text.length) clearInterval(interval);
+        if (i >= text.length && intervalId) clearInterval(intervalId);
       }, 30);
-      return () => clearInterval(interval);
     }, delay);
+
+    return () => {
+      clearTimeout(timeoutId);
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
   }, [text, delay]);
   return <span>{displayed}</span>;
 };
@@ -59,6 +66,7 @@ export default function Clash() {
   const [searchParams] = useSearchParams();
   const roomFromUrl = searchParams.get("room");
   const syncTimerRef = useRef(null);
+  const roomUnsubscribeRef = useRef(null);
 
   const [view, setView] = useState("BOOT"); 
   const [roomId, setRoomId] = useState(roomFromUrl || "");
@@ -106,6 +114,9 @@ export default function Clash() {
     return () => {
       if (syncTimerRef.current) {
         clearTimeout(syncTimerRef.current);
+      }
+      if (roomUnsubscribeRef.current) {
+        roomUnsubscribeRef.current();
       }
     };
   }, []);
@@ -218,14 +229,18 @@ export default function Clash() {
   // ─── 4. REAL-TIME SYNC ───
   const listenToRoom = (id, role) => {
     const roomRef = doc(db, "battles", id);
-    onSnapshot(roomRef, (docSnap) => {
+    if (roomUnsubscribeRef.current) {
+      roomUnsubscribeRef.current();
+    }
+
+    roomUnsubscribeRef.current = onSnapshot(roomRef, (docSnap) => {
       if (!docSnap.exists()) return;
       const data = docSnap.data();
       setRoomData(data);
       setQuestions(data?.questions || []);
       setCurrentQuestionIndex(Number(data?.currentQuestionIndex || 0));
       
-      if (data.status === "BATTLE" && view !== "BATTLE") {
+      if (data.status === "BATTLE") {
         setView("BATTLE");
       }
 
@@ -235,10 +250,10 @@ export default function Clash() {
 
       if (role === "player1" && data.player2) {
         setOpponentCode(data.player2.code);
-        setMyCode(data.player1?.code || myCode);
+        setMyCode((prev) => data.player1?.code || prev);
       } else if (role === "player2" && data.player1) {
         setOpponentCode(data.player1.code);
-        setMyCode(data.player2?.code || myCode);
+        setMyCode((prev) => data.player2?.code || prev);
       }
 
       setLanguage(data?.config?.language || "javascript");
