@@ -61,6 +61,22 @@ function formatFetchedAt(value) {
   });
 }
 
+function isIndiaJob(job) {
+  const location = String(job?.location || "").toLowerCase();
+
+  if (!location) {
+    return false;
+  }
+
+  return (
+    location.includes("india") ||
+    location.includes("remote - india") ||
+    location.includes("remote in india") ||
+    location.includes("india only") ||
+    location.includes("indian")
+  );
+}
+
 function JobsSkeleton() {
   return (
     <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
@@ -74,7 +90,7 @@ function JobsSkeleton() {
   );
 }
 
-function JobsEmpty({ categoryLabel }) {
+function JobsEmpty({ categoryLabel, indiaOnly }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center">
       <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
@@ -84,8 +100,9 @@ function JobsEmpty({ categoryLabel }) {
         No jobs found right now
       </h3>
       <p className="mx-auto max-w-xl text-sm leading-7 text-neutral-400">
-        There are no cached {categoryLabel} roles at the moment. Try again in a few
-        minutes or switch to another category.
+        {indiaOnly
+          ? `There are no cached ${categoryLabel} roles for India right now. Try all locations or switch to another category.`
+          : `There are no cached ${categoryLabel} roles at the moment. Try again in a few minutes or switch to another category.`}
       </p>
     </div>
   );
@@ -212,6 +229,7 @@ export default function Jobs() {
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
   const [dataSource, setDataSource] = useState(null);
   const [activeCategory, setActiveCategory] = useState(JOB_CATEGORIES[0]);
+  const [indiaOnly, setIndiaOnly] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -297,6 +315,11 @@ export default function Jobs() {
   const savedCount = useMemo(
     () => Object.values(savedJobIds).filter(Boolean).length,
     [savedJobIds]
+  );
+
+  const visibleJobs = useMemo(
+    () => (indiaOnly ? jobs.filter(isIndiaJob) : jobs),
+    [indiaOnly, jobs]
   );
 
   async function handleToggleSave(job) {
@@ -421,6 +444,34 @@ export default function Jobs() {
               );
             })}
           </div>
+
+          <div className="mt-5 flex flex-wrap items-center gap-3">
+            <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-neutral-500">
+              Location filter
+            </span>
+            <button
+              type="button"
+              onClick={() => setIndiaOnly(false)}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                !indiaOnly
+                  ? "bg-emerald-400 text-black"
+                  : "border border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
+              }`}
+            >
+              All locations
+            </button>
+            <button
+              type="button"
+              onClick={() => setIndiaOnly(true)}
+              className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
+                indiaOnly
+                  ? "bg-emerald-400 text-black"
+                  : "border border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
+              }`}
+            >
+              India only
+            </button>
+          </div>
         </section>
 
         <section className="mb-8 flex flex-col gap-4 rounded-[30px] border border-white/8 bg-white/[0.025] px-6 py-5 md:flex-row md:items-center md:justify-between">
@@ -433,6 +484,8 @@ export default function Jobs() {
                 ? "Jobs were served from Firestore cache."
                 : dataSource === "upstream"
                   ? "Jobs were freshly synced from Remotive."
+                  : dataSource === "client-fallback"
+                    ? "Jobs were loaded directly from Remotive because the callable endpoint was unavailable."
                   : "Choose a category to load current listings."}
             </p>
           </div>
@@ -470,11 +523,11 @@ export default function Jobs() {
 
         {loading ? (
           <JobsSkeleton />
-        ) : jobs.length === 0 ? (
-          <JobsEmpty categoryLabel={activeCategory.label} />
+        ) : visibleJobs.length === 0 ? (
+          <JobsEmpty categoryLabel={activeCategory.label} indiaOnly={indiaOnly} />
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            {jobs.map((job, index) => (
+            {visibleJobs.map((job, index) => (
               <JobCard
                 key={job.id}
                 job={job}
