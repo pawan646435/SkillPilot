@@ -55,6 +55,7 @@ export default function PublicNavbar() {
         <div className="items-center hidden gap-8 text-sm font-medium md:flex text-neutral-400">
           <Link to="/" className="transition-colors hover:text-white">Home</Link>
           <Link to="/news" className="transition-colors hover:text-white">News</Link>
+          <Link to="/jobs" className="transition-colors hover:text-white">Jobs</Link>
           <Link to="/interview" className="transition-colors hover:text-white">AI Interviewer</Link>
         </div>
 

@@ -11,6 +11,9 @@ const Login = lazy(() => import("./pages/Login"));
 const Register = lazy(() => import("./pages/Register"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 
+//jobs page
+const Jobs = lazy(() => import("./pages/Jobs"));
+
 // Dashboard Pages
 const DashboardLayout = lazy(() => import("./components/DashboardLayout"));
 const DashboardOverview = lazy(() => import("./pages/dashboard/DashboardOverview"));
@@ -74,6 +77,7 @@ function App() {
               <Route path="/login" element={<Login />} />
               <Route path="/register" element={<Register />} />
               <Route path="/news" element={<News />} />
+              <Route path="/jobs" element={<Jobs />} />
             </Route>
 
             {/* THE HACKER TERMINAL THEME */}
