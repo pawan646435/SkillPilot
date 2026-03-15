@@ -61,20 +61,16 @@ function formatFetchedAt(value) {
   });
 }
 
-function isIndiaJob(job) {
-  const location = String(job?.location || "").toLowerCase();
-
-  if (!location) {
-    return false;
+function getJobSourceLabel(source) {
+  if (source === "jsearch") {
+    return "JSearch";
   }
 
-  return (
-    location.includes("india") ||
-    location.includes("remote - india") ||
-    location.includes("remote in india") ||
-    location.includes("india only") ||
-    location.includes("indian")
-  );
+  if (source === "remotive") {
+    return "Remotive";
+  }
+
+  return "Job feed";
 }
 
 function JobsSkeleton() {
@@ -90,7 +86,7 @@ function JobsSkeleton() {
   );
 }
 
-function JobsEmpty({ categoryLabel, indiaOnly }) {
+function JobsEmpty({ categoryLabel, region }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center">
       <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
@@ -100,8 +96,8 @@ function JobsEmpty({ categoryLabel, indiaOnly }) {
         No jobs found right now
       </h3>
       <p className="mx-auto max-w-xl text-sm leading-7 text-neutral-400">
-        {indiaOnly
-          ? `There are no cached ${categoryLabel} roles for India right now. Try all locations or switch to another category.`
+        {region === "india"
+          ? `There are no cached ${categoryLabel} roles for India right now. Try the global feed or switch to another category.`
           : `There are no cached ${categoryLabel} roles at the moment. Try again in a few minutes or switch to another category.`}
       </p>
     </div>
@@ -131,7 +127,7 @@ function JobCard({ job, index, isSaved, saving, onToggleSave }) {
                 {job.companyName || "Unknown company"}
               </p>
               <p className="truncate text-xs uppercase tracking-[0.2em] text-neutral-500">
-                Source: Remotive
+                Source: {getJobSourceLabel(job.source)}
               </p>
             </div>
           </div>
@@ -202,7 +198,9 @@ function JobCard({ job, index, isSaved, saving, onToggleSave }) {
 
       <div className="mt-auto flex items-center justify-between gap-3">
         <p className="text-xs leading-6 text-neutral-500">
-          Remote listing syndicated from Remotive.
+          {job.source === "remotive"
+            ? "Remote listing syndicated from Remotive."
+            : "Search result delivered through JSearch."}
         </p>
         <a
           href={job.url || "#"}
@@ -229,7 +227,7 @@ export default function Jobs() {
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
   const [dataSource, setDataSource] = useState(null);
   const [activeCategory, setActiveCategory] = useState(JOB_CATEGORIES[0]);
-  const [indiaOnly, setIndiaOnly] = useState(false);
+  const [region, setRegion] = useState("global");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -285,7 +283,7 @@ export default function Jobs() {
       setError(null);
 
       try {
-        const data = await getJobsFromProxy(activeCategory.id);
+        const data = await getJobsFromProxy(activeCategory, region);
 
         if (!active) {
           return;
@@ -310,17 +308,14 @@ export default function Jobs() {
     return () => {
       active = false;
     };
-  }, [activeCategory]);
+  }, [activeCategory, region]);
 
   const savedCount = useMemo(
     () => Object.values(savedJobIds).filter(Boolean).length,
     [savedJobIds]
   );
 
-  const visibleJobs = useMemo(
-    () => (indiaOnly ? jobs.filter(isIndiaJob) : jobs),
-    [indiaOnly, jobs]
-  );
+  const visibleJobs = useMemo(() => jobs, [jobs]);
 
   async function handleToggleSave(job) {
     if (!user?.uid) {
@@ -373,7 +368,7 @@ export default function Jobs() {
     setError(null);
 
     try {
-      const data = await getJobsFromProxy(activeCategory.id);
+      const data = await getJobsFromProxy(activeCategory, region);
       setJobs(Array.isArray(data.jobs) ? data.jobs : []);
       setLastFetchedAt(data.fetchedAt || null);
       setDataSource(data.source || null);
@@ -447,24 +442,24 @@ export default function Jobs() {
 
           <div className="mt-5 flex flex-wrap items-center gap-3">
             <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-neutral-500">
-              Location filter
+              Search region
             </span>
             <button
               type="button"
-              onClick={() => setIndiaOnly(false)}
+              onClick={() => setRegion("global")}
               className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                !indiaOnly
+                region === "global"
                   ? "bg-emerald-400 text-black"
                   : "border border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
               }`}
             >
-              All locations
+              Global
             </button>
             <button
               type="button"
-              onClick={() => setIndiaOnly(true)}
+              onClick={() => setRegion("india")}
               className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                indiaOnly
+                region === "india"
                   ? "bg-emerald-400 text-black"
                   : "border border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
               }`}
@@ -483,9 +478,11 @@ export default function Jobs() {
               {dataSource === "cache"
                 ? "Jobs were served from Firestore cache."
                 : dataSource === "upstream"
-                  ? "Jobs were freshly synced from Remotive."
-                  : dataSource === "client-fallback"
-                    ? "Jobs were loaded directly from Remotive because the callable endpoint was unavailable."
+                  ? region === "global"
+                    ? "Jobs were freshly synced from JSearch and layered with Remotive remote listings."
+                    : "Jobs were freshly synced from JSearch."
+                  : dataSource === "stale-cache"
+                    ? "Upstream providers were unavailable, so stale cached jobs are being shown."
                   : "Choose a category to load current listings."}
             </p>
           </div>
@@ -524,7 +521,7 @@ export default function Jobs() {
         {loading ? (
           <JobsSkeleton />
         ) : visibleJobs.length === 0 ? (
-          <JobsEmpty categoryLabel={activeCategory.label} indiaOnly={indiaOnly} />
+          <JobsEmpty categoryLabel={activeCategory.label} region={region} />
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleJobs.map((job, index) => (
