@@ -594,32 +594,35 @@ export default function Clash() {
                   </div>
                 )}
 
-                {/* Use My Questions Toggle */}
-                <div className="border border-[#00ff41]/20 rounded-lg p-3">
+                {/* Use My Questions Toggle & List */}
+                <div className="border border-[#00ff41]/20 rounded-lg p-3 transition-all duration-300">
                   <label className="flex items-center gap-3 cursor-pointer">
                     <input type="checkbox" checked={useMyQuestions} onChange={(e) => setUseMyQuestions(e.target.checked)} className="accent-[#00ff41] w-4 h-4" />
                     <span className="text-xs tracking-widest uppercase">Use My Questions</span>
                   </label>
 
                   {useMyQuestions && (
-                    <div className="mt-3 max-h-48 overflow-auto space-y-1">
+                    <div className="mt-4 pt-4 border-t border-[#00ff41]/10 max-h-60 overflow-y-auto space-y-2 pr-2 custom-scrollbar">
                       {loadingBank ? (
-                        <p className="text-[10px] text-[#00ff41]/50 flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading question bank...</p>
+                        <p className="text-[10px] text-[#00ff41]/50 flex items-center justify-center gap-2 py-4"><Loader2 className="w-3 h-3 animate-spin" /> Loading question bank...</p>
                       ) : myQuestionBank.length === 0 ? (
-                        <p className="text-[10px] text-[#00ff41]/40">No questions found for {stack} • {difficulty}. Add some from the dashboard.</p>
+                        <p className="text-[10px] text-[#00ff41]/40 text-center py-4 bg-black/50 rounded border border-white/5">No questions found for {stack} • {difficulty}.<br/>Add some from the dashboard.</p>
                       ) : (
                         myQuestionBank.map((q) => (
-                          <label key={q.id} className={`flex items-start gap-2 cursor-pointer p-2 rounded border transition-all ${selectedQuestionIds.includes(q.id) ? "border-[#00ff41]/50 bg-[#00ff41]/5" : "border-[#00ff41]/10 hover:border-[#00ff41]/25"}`}>
-                            <input type="checkbox" checked={selectedQuestionIds.includes(q.id)} onChange={() => toggleQuestionSelection(q.id)} className="accent-[#00ff41] mt-0.5" />
-                            <div>
-                              <p className="text-xs">{q.title}</p>
-                              <p className="text-[10px] text-[#00ff41]/40">{(q.tags || []).join(", ")}</p>
+                          <label key={q.id} className={`flex items-start gap-3 cursor-pointer p-3 rounded-lg border transition-all ${selectedQuestionIds.includes(q.id) ? "border-[#00ff41]/50 bg-[#00ff41]/10" : "border-[#00ff41]/10 hover:border-[#00ff41]/30 bg-black/40"}`}>
+                            <input type="checkbox" checked={selectedQuestionIds.includes(q.id)} onChange={() => toggleQuestionSelection(q.id)} className="accent-[#00ff41] mt-0.5 w-3.5 h-3.5" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs font-semibold text-white truncate">{q.title}</p>
+                              <p className="text-[10px] text-[#00ff41]/60 mt-0.5 truncate">{(q.tags || []).join(", ")}</p>
                             </div>
                           </label>
                         ))
                       )}
+                      
                       {selectedQuestionIds.length > 0 && (
-                        <p className="text-[10px] text-[#00ff41]/60 mt-2">{selectedQuestionIds.length} question(s) selected</p>
+                        <div className="sticky bottom-0 bg-black/90 pt-2 pb-1 text-[10px] text-[#00ff41] font-bold tracking-wider text-center border-t border-[#00ff41]/20 mt-2">
+                          {selectedQuestionIds.length} question(s) selected
+                        </div>
                       )}
                     </div>
                   )}
