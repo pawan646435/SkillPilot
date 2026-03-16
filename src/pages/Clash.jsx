@@ -1,6 +1,6 @@
 // src/pages/Clash.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence } from "framer-motion";
 import { Terminal, Users, Copy, CheckCircle2, Code2, AlertTriangle, Loader2, FlaskConical, Send, Trophy, Clock, Eye } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
@@ -790,34 +790,36 @@ export default function Clash() {
           <motion.div key="battle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 flex flex-col h-screen">
 
             {/* ── Top Nav Bar ── */}
-            <header className="h-12 border-b border-white/10 bg-[#1a1a1a] flex items-center justify-between px-4 shrink-0">
-              <div className="flex items-center gap-3">
-                <button onClick={() => navigate("/dashboard")} className="text-neutral-400 hover:text-white text-xs">← Back</button>
+            <header className="min-h-12 border-b border-white/10 bg-[#1a1a1a] flex flex-wrap items-center justify-between px-4 py-2 gap-4 shrink-0">
+              <div className="flex items-center gap-3 shrink-0">
+                <button onClick={() => navigate("/dashboard")} className="text-neutral-400 hover:text-white text-xs whitespace-nowrap">← Back</button>
                 <div className="w-px h-5 bg-white/10" />
-                <span className="text-xs font-semibold text-white/90">
+                <span className="text-xs font-semibold text-white/90 whitespace-nowrap">
                   {roomData?.config?.stack || stack} • {roomData?.config?.difficulty || difficulty}
                 </span>
-                <span className="text-xs text-neutral-500 ml-1">ROOM: {roomId}</span>
+                <span className="text-xs text-neutral-500 ml-1 hidden sm:inline">ROOM: {roomId}</span>
               </div>
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center gap-4">
                 {/* Timer */}
                 {timeRemaining !== null && (
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-bold ${timeRemaining <= 60 ? "bg-rose-500/15 text-rose-400 animate-pulse" : "bg-amber-500/10 text-amber-300"}`}>
-                    <Clock className="w-3 h-3" />
+                  <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-mono font-bold shrink-0 ${timeRemaining <= 60 ? "bg-rose-500/15 text-rose-400 animate-pulse ring-1 ring-rose-500/50" : "bg-amber-500/15 text-amber-300 ring-1 ring-amber-500/30"}`}>
+                    <Clock className="w-3.5 h-3.5" />
                     {formatTime(timeRemaining)}
                   </div>
                 )}
 
                 {/* Scores */}
-                <div className="flex items-center gap-1 text-[11px]">
-                  <span className="text-emerald-400 font-semibold">{roomData?.scores?.[auth.currentUser?.uid] || 0}</span>
+                <div className="flex items-center gap-1.5 text-[11px] bg-black/40 px-2 py-1 rounded border border-white/5 shrink-0">
+                  <span className="text-emerald-400 font-bold px-1">{roomData?.scores?.[auth.currentUser?.uid] || 0}</span>
                   <span className="text-neutral-600">:</span>
-                  <span className="text-rose-400 font-semibold">{playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}</span>
+                  <span className="text-rose-400 font-bold px-1">{playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}</span>
                 </div>
 
-                <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs bg-amber-500/15 text-amber-300 px-3 py-1 rounded hover:bg-amber-500/25 disabled:opacity-40 font-medium">Finalize</button>
-                <button onClick={abortBattle} className="text-xs bg-rose-500/10 text-rose-400 px-3 py-1 rounded hover:bg-rose-500/20 font-medium">Abort</button>
+                <div className="flex gap-2 shrink-0">
+                  <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs bg-amber-500/15 text-amber-300 px-3 py-1.5 rounded hover:bg-amber-500/25 disabled:opacity-40 font-medium transition-colors border border-amber-500/20 hover:border-amber-500/40">Finalize</button>
+                  <button onClick={abortBattle} className="text-xs bg-rose-500/10 text-rose-400 px-3 py-1.5 rounded hover:bg-rose-500/20 font-medium transition-colors border border-rose-500/20 hover:border-rose-500/40">Abort</button>
+                </div>
               </div>
             </header>
 
