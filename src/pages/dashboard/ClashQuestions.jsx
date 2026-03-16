@@ -157,8 +157,12 @@ export default function ClashQuestions() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <select value={stack} onChange={(e) => setStack(e.target.value)} className="px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white">
             <option value="DSA">DSA</option>
+            <option value="FRONTEND">FRONTEND</option>
+            <option value="BACKEND">BACKEND</option>
+            <option value="SYSTEM_DESIGN">SYSTEM DESIGN</option>
             <option value="JAVASCRIPT">JAVASCRIPT</option>
             <option value="PYTHON">PYTHON</option>
+            <option value="DEVOPS">DEVOPS</option>
           </select>
           <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="px-4 py-3 bg-black/50 border border-white/10 rounded-xl text-white">
             <option value="EASY">EASY</option>

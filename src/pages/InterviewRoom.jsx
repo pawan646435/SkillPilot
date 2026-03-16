@@ -29,11 +29,13 @@ export default function InterviewRoom() {
   const role = state?.role || "Frontend Engineer";
   const difficulty = state?.difficulty || "Medium";
   const questionCount = state?.questionCount || 5;
+  const questionType = state?.questionType || "subjective"; // "subjective" | "mcq"
 
   const [phase, setPhase] = useState(PHASE.LOADING_QUESTION);
   const [questionIndex, setQuestionIndex] = useState(0);
   const [currentQuestion, setCurrentQuestion] = useState(null);
   const [userAnswer, setUserAnswer] = useState("");
+  const [selectedOption, setSelectedOption] = useState(null); // for MCQ
   const [evaluation, setEvaluation] = useState(null);
   const [allQA, setAllQA] = useState([]);
   const [showHint, setShowHint] = useState(false);
@@ -47,11 +49,12 @@ export default function InterviewRoom() {
   const loadNextQuestion = async (previousQA) => {
     setPhase(PHASE.LOADING_QUESTION);
     setUserAnswer("");
+    setSelectedOption(null);
     setEvaluation(null);
     setShowHint(false);
     setError(null);
     try {
-      const q = await generateInterviewQuestion(role, difficulty, previousQA);
+      const q = await generateInterviewQuestion(role, difficulty, previousQA, questionType);
       setCurrentQuestion(q);
       setPhase(PHASE.ANSWERING);
     } catch (err) {
@@ -77,16 +80,19 @@ export default function InterviewRoom() {
   }, [phase]);
 
   const handleSubmitAnswer = async () => {
-    if (!userAnswer.trim() && phase !== PHASE.ANSWERING) return;
-    stopListening();
+    const answer = questionType === "mcq" ? selectedOption : userAnswer;
+    if (!answer?.trim() && phase !== PHASE.ANSWERING) return;
+    if (questionType !== "mcq") stopListening();
     setPhase(PHASE.EVALUATING);
     setError(null);
     try {
       const result = await evaluateAnswer(
         currentQuestion.question,
-        userAnswer,
+        answer,
         role,
-        difficulty
+        difficulty,
+        questionType,
+        currentQuestion.correctAnswer
       );
       setEvaluation(result);
       setPhase(PHASE.SHOWING_RESULT);
@@ -103,7 +109,7 @@ export default function InterviewRoom() {
       {
         question: currentQuestion.question,
         topic: currentQuestion.topic,
-        answer: userAnswer,
+        answer: questionType === "mcq" ? selectedOption : userAnswer,
         score: evaluation?.score ?? 0,
         feedback: evaluation?.feedback ?? "",
         strengths: evaluation?.strengths ?? [],
@@ -119,24 +125,32 @@ export default function InterviewRoom() {
       setPhase(PHASE.GENERATING_REPORT);
       try {
         const report = await generateFinalReport(role, difficulty, newQA);
-        // Save to Firestore
-        const user = auth.currentUser;
+
+        // Save to Firestore — non-fatal: navigate to report even if this fails
         let docId = null;
-        if (user) {
-          const docRef = await addDoc(
-            collection(db, "users", user.uid, "interviewReports"),
-            {
-              role,
-              difficulty,
-              questionCount,
-              allQA: newQA,
-              report,
-              createdAt: serverTimestamp(),
-            }
-          );
-          docId = docRef.id;
+        try {
+          const user = auth.currentUser;
+          if (user) {
+            const docRef = await addDoc(
+              collection(db, "users", user.uid, "interviewReports"),
+              {
+                role,
+                difficulty,
+                questionCount,
+                questionType,
+                allQA: newQA,
+                report,
+                createdAt: serverTimestamp(),
+              }
+            );
+            docId = docRef.id;
+          }
+        } catch (saveErr) {
+          // Firestore save failed (e.g. permissions) — log but don't block the user
+          console.warn("Could not save interview report to Firestore:", saveErr.message);
         }
-        navigate("/interview/report", { state: { report, allQA: newQA, role, difficulty, docId } });
+
+        navigate("/interview/report", { state: { report, allQA: newQA, role, difficulty, docId }, replace: true });
       } catch (err) {
         console.error("Error generating report:", err);
         setError(`Failed to generate report: ${err.message}`);
@@ -330,45 +344,75 @@ export default function InterviewRoom() {
                 transition={{ duration: 0.3 }}
                 className="space-y-3"
               >
-                <div className="relative">
-                  <textarea
-                    ref={textareaRef}
-                    value={userAnswer}
-                    onChange={(e) => setUserAnswer(e.target.value)}
-                    disabled={phase === PHASE.EVALUATING}
-                    placeholder="Type your answer here, or use the microphone to speak..."
-                    rows={6}
-                    className="w-full p-5 rounded-2xl bg-white/[0.03] border border-white/10 text-[#ededed] placeholder-neutral-700 text-sm leading-relaxed resize-none focus:outline-none focus:border-white/20 transition-colors font-mono disabled:opacity-50"
-                  />
-                  {isListening && (
-                    <div className="absolute flex items-center gap-2 top-4 right-4">
-                      <motion.div
-                        animate={{ scale: [1, 1.3, 1] }}
-                        transition={{ duration: 1, repeat: Infinity }}
-                        className="w-2 h-2 rounded-full bg-rose-400"
-                      />
-                      <span className="font-mono text-xs text-rose-400">REC</span>
-                    </div>
-                  )}
-                </div>
+                {questionType === "mcq" && currentQuestion?.options ? (
+                  // MCQ option buttons
+                  <div className="space-y-2">
+                    {currentQuestion.options.map((opt, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setSelectedOption(opt)}
+                        disabled={phase === PHASE.EVALUATING}
+                        className={`w-full text-left px-5 py-3.5 rounded-xl border text-sm transition-all duration-200 ${
+                          selectedOption === opt
+                            ? "bg-white/10 border-white/40 text-white font-medium"
+                            : "bg-white/[0.02] border-white/5 text-neutral-400 hover:text-white hover:border-white/20 hover:bg-white/[0.04]"
+                        } disabled:opacity-40 disabled:cursor-not-allowed`}
+                      >
+                        <span className="inline-block w-6 text-neutral-600 font-mono">
+                          {String.fromCharCode(65 + i)}.
+                        </span>
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  // Subjective textarea
+                  <div className="relative">
+                    <textarea
+                      ref={textareaRef}
+                      value={userAnswer}
+                      onChange={(e) => setUserAnswer(e.target.value)}
+                      disabled={phase === PHASE.EVALUATING}
+                      placeholder="Type your answer here, or use the microphone to speak..."
+                      rows={6}
+                      className="w-full p-5 rounded-2xl bg-white/[0.03] border border-white/10 text-[#ededed] placeholder-neutral-700 text-sm leading-relaxed resize-none focus:outline-none focus:border-white/20 transition-colors font-mono disabled:opacity-50"
+                    />
+                    {isListening && (
+                      <div className="absolute flex items-center gap-2 top-4 right-4">
+                        <motion.div
+                          animate={{ scale: [1, 1.3, 1] }}
+                          transition={{ duration: 1, repeat: Infinity }}
+                          className="w-2 h-2 rounded-full bg-rose-400"
+                        />
+                        <span className="font-mono text-xs text-rose-400">REC</span>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="flex items-center gap-3">
-                  <button
-                    onClick={toggleVoice}
-                    disabled={phase === PHASE.EVALUATING}
-                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${
-                      isListening
-                        ? "bg-rose-400/10 border-rose-400/30 text-rose-400 hover:bg-rose-400/20"
-                        : "bg-white/[0.03] border-white/10 text-neutral-500 hover:text-white hover:border-white/20"
-                    } disabled:opacity-40`}
-                  >
-                    {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-                    {isListening ? "Stop" : "Voice"}
-                  </button>
+                  {/* Only show voice button for subjective */}
+                  {questionType !== "mcq" && (
+                    <button
+                      onClick={toggleVoice}
+                      disabled={phase === PHASE.EVALUATING}
+                      className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-sm font-medium transition-all duration-200 ${
+                        isListening
+                          ? "bg-rose-400/10 border-rose-400/30 text-rose-400 hover:bg-rose-400/20"
+                          : "bg-white/[0.03] border-white/10 text-neutral-500 hover:text-white hover:border-white/20"
+                      } disabled:opacity-40`}
+                    >
+                      {isListening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                      {isListening ? "Stop" : "Voice"}
+                    </button>
+                  )}
 
                   <button
                     onClick={handleSubmitAnswer}
-                    disabled={phase === PHASE.EVALUATING || !userAnswer.trim()}
+                    disabled={
+                      phase === PHASE.EVALUATING ||
+                      (questionType === "mcq" ? !selectedOption : !userAnswer.trim())
+                    }
                     className="flex items-center gap-2 flex-1 justify-center px-6 py-2.5 bg-white text-black font-semibold rounded-xl text-sm hover:bg-neutral-100 transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(255,255,255,0.08)]"
                   >
                     {phase === PHASE.EVALUATING ? (

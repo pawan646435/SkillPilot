@@ -104,13 +104,31 @@ export async function generateGeminiResponse(messages) {
   return callGroqProxy(messages);
 }
 
-export async function generateInterviewQuestion(role, difficulty, previousQA = []) {
+export async function generateInterviewQuestion(role, difficulty, previousQA = [], questionType = "subjective") {
   const history =
     previousQA.length > 0
       ? `\nPrevious questions already asked:\n${previousQA.map((qa, i) => `Q${i + 1}: ${qa.question}`).join("\n")}\n`
       : "";
 
-  const prompt = `You are a senior technical interviewer at a top-tier tech company conducting a real interview.
+  const isMCQ = questionType === "mcq";
+
+  const prompt = isMCQ
+    ? `You are a senior technical interviewer at a top-tier tech company conducting a real interview.
+Role being interviewed for: ${role}
+Difficulty level: ${difficulty}
+${history}
+Create the next multiple-choice interview question. Vary the topic from previous questions.
+Provide exactly 4 answer options. Only one must be correct.
+
+You MUST respond ONLY with a valid JSON object. No explanation, no markdown, just JSON:
+{
+  "question": "the interview question here",
+  "topic": "topic category (e.g. System Design, JavaScript, React, Algorithms, etc.)",
+  "hint": "a subtle one-sentence hint if the candidate is unsure",
+  "options": ["Option A text", "Option B text", "Option C text", "Option D text"],
+  "correctAnswer": "the exact text of the correct option from options array"
+}`
+    : `You are a senior technical interviewer at a top-tier tech company conducting a real interview.
 Role being interviewed for: ${role}
 Difficulty level: ${difficulty}
 ${history}
@@ -127,7 +145,22 @@ You MUST respond ONLY with a valid JSON object. No explanation, no markdown, jus
   return parseJsonResponse(text, "Interview question proxy returned invalid JSON.");
 }
 
-export async function evaluateAnswer(question, answer, role, difficulty) {
+export async function evaluateAnswer(question, answer, role, difficulty, questionType = "subjective", correctAnswer = null) {
+  // ── MCQ: instant evaluation without AI call ──
+  if (questionType === "mcq") {
+    const isCorrect = correctAnswer && answer && answer.trim() === correctAnswer.trim();
+    return {
+      score: isCorrect ? 10 : 0,
+      feedback: isCorrect
+        ? "Correct! You selected the right answer."
+        : `Incorrect. The correct answer was: "${correctAnswer || "(unknown)"}".`,
+      strengths: isCorrect ? ["Picked the correct option"] : [],
+      improvements: isCorrect ? [] : ["Review this topic and understand why the correct answer is right"],
+      modelAnswer: correctAnswer || "",
+    };
+  }
+
+  // ── Subjective: AI-evaluated ──
   if (!answer || answer.trim().length < 5) {
     return {
       score: 0,

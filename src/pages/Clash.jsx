@@ -1,22 +1,39 @@
 // src/pages/Clash.jsx
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Terminal, Users, Play, Copy, CheckCircle2, Code2, AlertTriangle, Loader2, FlaskConical, Send, Trophy } from "lucide-react";
+import { Terminal, Users, Copy, CheckCircle2, Code2, AlertTriangle, Loader2, FlaskConical, Send, Trophy, Clock, Eye } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { auth, db } from "../lib/firebase";
-import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp } from "firebase/firestore";
+import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { fetchClashQuestions, finalizeClashMatch, generateClashQuestions, joinClashRoom, runClashCode, submitClashAnswer } from "../services/clashService";
 
+// ── Stacks and Timer Options ──
+const STACK_OPTIONS = [
+  { value: "DSA", label: "DSA" },
+  { value: "FRONTEND", label: "Frontend" },
+  { value: "BACKEND", label: "Backend" },
+  { value: "SYSTEM_DESIGN", label: "System Design" },
+  { value: "JAVASCRIPT", label: "JavaScript" },
+  { value: "PYTHON", label: "Python" },
+  { value: "DEVOPS", label: "DevOps" },
+];
+
+const TIMER_OPTIONS = [
+  { value: 0, label: "No Timer" },
+  { value: 5, label: "5 min" },
+  { value: 10, label: "10 min" },
+  { value: 15, label: "15 min" },
+  { value: 20, label: "20 min" },
+  { value: 30, label: "30 min" },
+];
+
 const DEFAULT_CODE_BY_LANGUAGE = {
-  javascript: `function solution(...args) {
-  return null;
-}
-`,
-  python: `def solution(*args):
-    return None
-`,
+  javascript: `function solution(...args) {\n  return null;\n}\n`,
+  python: `def solution(*args):\n    return None\n`,
+  cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nauto solution() {\n    return 0;\n}\n\nint main() {\n    ios_base::sync_with_stdio(false);\n    cin.tie(NULL);\n    return 0;\n}\n`,
+  java: `import java.util.*;\n\npublic class Solution {\n    public static void main(String[] args) {\n        System.out.println(solution());\n    }\n    public static Object solution(Object... params) {\n        return null;\n    }\n}\n`,
 };
 
 function getStarterCode(question, language) {
@@ -40,14 +57,60 @@ function mapRoomQuestion(question, fallbackDifficulty) {
 
 function formatTerminalValue(value) {
   if (typeof value === "string") return value;
-
-  try {
-    return JSON.stringify(value);
-  } catch {
-    return String(value);
-  }
+  try { return JSON.stringify(value); } catch { return String(value); }
 }
 
+function formatTime(totalSeconds) {
+  if (totalSeconds <= 0) return "00:00";
+  const m = Math.floor(totalSeconds / 60);
+  const s = totalSeconds % 60;
+  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+}
+
+// ── Opponent Activity Component ──
+const OpponentActivity = ({ opponentCode }) => {
+  const lines = (opponentCode || "").split("\n");
+  const [prevLength, setPrevLength] = useState(0);
+  const isTyping = lines.length !== prevLength;
+
+  useEffect(() => {
+    const timer = setTimeout(() => setPrevLength(lines.length), 2000);
+    return () => clearTimeout(timer);
+  }, [lines.length]);
+
+  return (
+    <div className="h-full overflow-hidden p-4 bg-[#050505]">
+      <div className="flex items-center justify-between mb-3">
+        <div className="text-[10px] uppercase tracking-[0.25em] text-[#00ff41]/50">
+          Opponent Activity
+        </div>
+        <div className="text-[10px] font-mono text-[#00ff41]/40">
+          {lines.length} lines
+        </div>
+      </div>
+      <div className="space-y-[5px] overflow-hidden max-h-full">
+        {lines.map((line, i) => (
+          <motion.div
+            key={i}
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: `${Math.min(95, Math.max(8, line.length * 1.8))}%`, opacity: 1 }}
+            transition={{ duration: 0.4, delay: i * 0.02 }}
+            className="h-[12px] rounded-sm bg-[#00ff41]/12"
+          />
+        ))}
+        {isTyping && (
+          <motion.div
+            animate={{ opacity: [0.3, 1, 0.3] }}
+            transition={{ duration: 0.8, repeat: Infinity }}
+            className="w-2 h-3.5 bg-[#00ff41] rounded-sm mt-1"
+          />
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Output Terminal ──
 const OutputTerminal = ({ runState, finalizedResult }) => {
   const visibleCases = runState.output?.cases?.filter((item) => !item.hidden) || [];
   const hiddenCaseCount = runState.output?.cases?.filter((item) => item.hidden).length || 0;
@@ -61,22 +124,18 @@ const OutputTerminal = ({ runState, finalizedResult }) => {
         </span>
         <span className="text-cyan-200/50">sandbox://stdout</span>
       </div>
-
       <div className="flex-1 space-y-2 overflow-auto px-4 py-3 text-[11px] leading-6 text-cyan-50/90">
         {runState.running && <p className="text-cyan-300">{">"} running local test harness...</p>}
         {runState.submitting && <p className="text-[#00ff41]">{">"} submitting solution to arena...</p>}
         {runState.error && <p className="text-rose-400">[error] {runState.error}</p>}
-
         {!runState.error && !runState.running && !runState.submitting && !runState.output && (
           <p className="text-cyan-100/35">{">"} run code or submit to inspect output...</p>
         )}
-
         {runState.output && (
           <>
             <p className="text-[#00ff41]">
               {">"} passed {runState.output.passed}/{runState.output.total} tests | elapsed {runState.output.elapsedMs} ms | points {runState.output.points}
             </p>
-
             {visibleCases.map((item) => (
               <div key={`case-${item.index}`} className="rounded-lg border border-white/10 bg-black/30 px-3 py-2">
                 <p className={item.passed ? "text-emerald-300" : "text-rose-300"}>
@@ -87,13 +146,11 @@ const OutputTerminal = ({ runState, finalizedResult }) => {
                 {item.error && <p className="text-rose-300">error: {item.error}</p>}
               </div>
             ))}
-
             {hiddenCaseCount > 0 && (
               <p className="text-cyan-100/45">{">"} hidden test cases evaluated server-side: {hiddenCaseCount}</p>
             )}
           </>
         )}
-
         {finalizedResult && (
           <div className="rounded-lg border border-amber-400/20 bg-amber-400/5 px-3 py-2 text-amber-200">
             <p>{">"} match finalized</p>
@@ -118,25 +175,23 @@ const TerminalText = ({ text, delay = 0 }) => {
         if (i >= text.length && intervalId) clearInterval(intervalId);
       }, 30);
     }, delay);
-
-    return () => {
-      clearTimeout(timeoutId);
-      if (intervalId) {
-        clearInterval(intervalId);
-      }
-    };
+    return () => { clearTimeout(timeoutId); if (intervalId) clearInterval(intervalId); };
   }, [text, delay]);
   return <span>{displayed}</span>;
 };
 
+// ══════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════
 export default function Clash() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const roomFromUrl = searchParams.get("room");
   const syncTimerRef = useRef(null);
   const roomUnsubscribeRef = useRef(null);
+  const timerIntervalRef = useRef(null);
 
-  const [view, setView] = useState("BOOT"); 
+  const [view, setView] = useState("BOOT");
   const [roomId, setRoomId] = useState(roomFromUrl || "");
   const [roomData, setRoomData] = useState(null);
   const [copied, setCopied] = useState(false);
@@ -154,68 +209,151 @@ export default function Clash() {
   const [abortedInfo, setAbortedInfo] = useState(null);
   const [creatingBattle, setCreatingBattle] = useState(false);
 
-  // ─── 1. BOOT SEQUENCE & AUTH CHECK ───
+  // New: Timer
+  const [timerMinutes, setTimerMinutes] = useState(0);
+  const [timeRemaining, setTimeRemaining] = useState(null);
+  const [timerExpired, setTimerExpired] = useState(false);
+
+  // New: Manual question picker
+  const [useMyQuestions, setUseMyQuestions] = useState(false);
+  const [myQuestionBank, setMyQuestionBank] = useState([]);
+  const [selectedQuestionIds, setSelectedQuestionIds] = useState([]);
+  const [loadingBank, setLoadingBank] = useState(false);
+
+  // New: show answers on finished
+  const [showAnswers, setShowAnswers] = useState(false);
+
+  // ─── BOOT SEQUENCE & AUTH CHECK ───
+  const handleJoinRoom = useCallback(async (idToJoin) => {
+    try {
+      const response = await joinClashRoom({ roomId: idToJoin });
+      const joinedRoom = response?.room;
+      const role = response?.role;
+      if (!joinedRoom || !role) throw new Error("Room not found or unavailable.");
+
+      const joinLanguage = joinedRoom?.config?.language || "javascript";
+      const fallbackCode = getStarterCode(joinedRoom?.questions?.[0], joinLanguage);
+      const initialCode = role === "player1"
+        ? joinedRoom?.player1?.code || fallbackCode
+        : joinedRoom?.player2?.code || fallbackCode;
+
+      setRoomId(idToJoin);
+      setRoomData(joinedRoom);
+      setQuestions(joinedRoom?.questions || []);
+      setCurrentQuestionIndex(Number(joinedRoom?.currentQuestionIndex || 0));
+      setPlayerRole(role);
+      setLanguage(joinLanguage);
+      setMyCode(initialCode);
+      setView(joinedRoom?.status === "BATTLE" ? "BATTLE" : "WAITING");
+      listenToRoom(idToJoin, role);
+    } catch (error) {
+      alert(error.message || "Room not found or expired.");
+      setView("LOBBY");
+    }
+  }, []);
+
   useEffect(() => {
     let bootTimer = null;
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        // User is logged in, proceed with boot sequence
         bootTimer = setTimeout(() => {
-          if (roomFromUrl) {
-            handleJoinRoom(roomFromUrl);
-          } else {
-            setView("LOBBY");
-          }
+          if (roomFromUrl) { handleJoinRoom(roomFromUrl); } else { setView("LOBBY"); }
         }, 3500);
       } else {
-        // User not logged in, redirect to login but save the destination!
         if (roomFromUrl) {
           navigate(`/login?redirect=${encodeURIComponent('/clash?room=' + roomFromUrl)}`);
-        } else {
-          navigate("/login");
-        }
+        } else { navigate("/login"); }
       }
     });
-
-    return () => {
-      unsubscribe();
-      if (bootTimer) {
-        clearTimeout(bootTimer);
-      }
-    };
-  }, [navigate, roomFromUrl]);
+    return () => { unsubscribe(); if (bootTimer) clearTimeout(bootTimer); };
+  }, [navigate, roomFromUrl, handleJoinRoom]);
 
   useEffect(() => {
     return () => {
-      if (syncTimerRef.current) {
-        clearTimeout(syncTimerRef.current);
-      }
-      if (roomUnsubscribeRef.current) {
-        roomUnsubscribeRef.current();
-      }
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
+      if (roomUnsubscribeRef.current) roomUnsubscribeRef.current();
+      if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
     };
   }, []);
 
   const currentQuestion = useMemo(() => questions[currentQuestionIndex] || null, [questions, currentQuestionIndex]);
 
-  // ─── 2. CREATE A BATTLE ROOM ───
+  // ─── Load question bank when "Use My Questions" is toggled ───
+  useEffect(() => {
+    if (!useMyQuestions) { setMyQuestionBank([]); setSelectedQuestionIds([]); return; }
+    const loadBank = async () => {
+      setLoadingBank(true);
+      try {
+        const constraints = [];
+        if (stack) constraints.push(where("stack", "==", stack));
+        if (difficulty) constraints.push(where("difficulty", "==", difficulty));
+        constraints.push(orderBy("createdAt", "desc"));
+        constraints.push(limit(50));
+        const q = query(collection(db, "clashQuestions"), ...constraints);
+        const snap = await getDocs(q);
+        setMyQuestionBank(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+      } catch { setMyQuestionBank([]); }
+      setLoadingBank(false);
+    };
+    loadBank();
+  }, [useMyQuestions, stack, difficulty]);
+
+  // ─── Timer logic ───
+  useEffect(() => {
+    if (view !== "BATTLE" || !roomData?.config?.timerMinutes || roomData.config.timerMinutes <= 0) {
+      setTimeRemaining(null);
+      return;
+    }
+    const battleStartedAt = roomData?.battleStartedAt?.seconds;
+    if (!battleStartedAt) return;
+
+    const endTime = battleStartedAt + roomData.config.timerMinutes * 60;
+
+    const tick = () => {
+      const nowSec = Math.floor(Date.now() / 1000);
+      const remaining = Math.max(0, endTime - nowSec);
+      setTimeRemaining(remaining);
+      if (remaining <= 0) {
+        setTimerExpired(true);
+        if (timerIntervalRef.current) clearInterval(timerIntervalRef.current);
+      }
+    };
+
+    tick();
+    timerIntervalRef.current = setInterval(tick, 1000);
+    return () => { if (timerIntervalRef.current) clearInterval(timerIntervalRef.current); };
+  }, [view, roomData?.config?.timerMinutes, roomData?.battleStartedAt?.seconds]);
+
+  // Auto-finalize when timer expires
+  useEffect(() => {
+    if (timerExpired && roomData?.status === "BATTLE" && roomId) {
+      finalizeBattle();
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timerExpired]);
+
+  // ─── CREATE A BATTLE ROOM ───
   const handleCreateRoom = async () => {
     const user = auth.currentUser;
     if (!user || creatingBattle) return;
-
     setCreatingBattle(true);
     setRunState((prev) => ({ ...prev, error: "" }));
 
     try {
-      const existingQuestions = await fetchClashQuestions({ stack, difficulty, count: questionCount });
-      const missingCount = Math.max(0, questionCount - existingQuestions.length);
+      let selectedQuestions;
 
-      const generatedQuestions =
-        missingCount > 0
+      if (useMyQuestions && selectedQuestionIds.length > 0) {
+        // Use manually selected questions
+        selectedQuestions = myQuestionBank.filter((q) => selectedQuestionIds.includes(q.id));
+      } else {
+        // Default: fetch + generate
+        const existingQuestions = await fetchClashQuestions({ stack, difficulty, count: questionCount });
+        const missingCount = Math.max(0, questionCount - existingQuestions.length);
+        const generatedQuestions = missingCount > 0
           ? await generateClashQuestions({ stack, difficulty, language, count: missingCount })
           : [];
-
-      const selectedQuestions = [...existingQuestions, ...generatedQuestions].slice(0, questionCount);
+        selectedQuestions = [...existingQuestions, ...generatedQuestions].slice(0, questionCount);
+      }
 
       if (!selectedQuestions.length) {
         setRunState((prev) => ({ ...prev, error: "Could not load or generate clash questions for selected filters." }));
@@ -230,12 +368,7 @@ export default function Clash() {
       await setDoc(roomRef, {
         status: "WAITING",
         mode: "PRACTICAL",
-        config: {
-          stack,
-          difficulty,
-          questionCount: roomQuestions.length,
-          language,
-        },
+        config: { stack, difficulty, questionCount: roomQuestions.length, language, timerMinutes },
         questions: roomQuestions,
         currentQuestionIndex: 0,
         scores: { [user.uid]: 0 },
@@ -260,45 +393,10 @@ export default function Clash() {
     }
   };
 
-  // ─── 3. JOIN A BATTLE ROOM ───
-  const handleJoinRoom = async (idToJoin) => {
-    try {
-      const response = await joinClashRoom({ roomId: idToJoin });
-      const joinedRoom = response?.room;
-      const role = response?.role;
-
-      if (!joinedRoom || !role) {
-        throw new Error("Room not found or unavailable.");
-      }
-
-      const joinLanguage = joinedRoom?.config?.language || "javascript";
-      const fallbackCode = getStarterCode(joinedRoom?.questions?.[0], joinLanguage);
-      const initialCode =
-        role === "player1"
-          ? joinedRoom?.player1?.code || fallbackCode
-          : joinedRoom?.player2?.code || fallbackCode;
-
-      setRoomId(idToJoin);
-      setRoomData(joinedRoom);
-      setQuestions(joinedRoom?.questions || []);
-      setCurrentQuestionIndex(Number(joinedRoom?.currentQuestionIndex || 0));
-      setPlayerRole(role);
-      setLanguage(joinLanguage);
-      setMyCode(initialCode);
-      setView(joinedRoom?.status === "BATTLE" ? "BATTLE" : "WAITING");
-      listenToRoom(idToJoin, role);
-    } catch (error) {
-      alert(error.message || "Room not found or expired.");
-      setView("LOBBY");
-    }
-  };
-
-  // ─── 4. REAL-TIME SYNC ───
+  // ─── REAL-TIME SYNC ───
   const listenToRoom = (id, role) => {
     const roomRef = doc(db, "battles", id);
-    if (roomUnsubscribeRef.current) {
-      roomUnsubscribeRef.current();
-    }
+    if (roomUnsubscribeRef.current) roomUnsubscribeRef.current();
 
     roomUnsubscribeRef.current = onSnapshot(roomRef, (docSnap) => {
       if (!docSnap.exists()) return;
@@ -306,22 +404,18 @@ export default function Clash() {
       setRoomData(data);
       setQuestions(data?.questions || []);
       setCurrentQuestionIndex(Number(data?.currentQuestionIndex || 0));
-      
-      if (data.status === "BATTLE") {
-        setView("BATTLE");
-      }
+
+      if (data.status === "BATTLE") setView("BATTLE");
 
       if (data.status === "FINISHED") {
         setFinalizedResult(data.result || null);
+        setView("FINISHED");
       }
 
       if (data.status === "ABORTED") {
         const abortedBy = data?.abortedBy || null;
         setAbortedInfo(abortedBy);
-
-        if (abortedBy?.uid !== auth.currentUser?.uid) {
-          setView("ABORTED");
-        }
+        if (abortedBy?.uid !== auth.currentUser?.uid) setView("ABORTED");
       }
 
       if (role === "player1" && data.player2) {
@@ -339,10 +433,7 @@ export default function Clash() {
   const handleCodeChange = async (newCode) => {
     setMyCode(newCode);
     if (roomId && playerRole) {
-      if (syncTimerRef.current) {
-        clearTimeout(syncTimerRef.current);
-      }
-
+      if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       syncTimerRef.current = setTimeout(async () => {
         const roomRef = doc(db, "battles", roomId);
         await updateDoc(roomRef, { [`${playerRole}.code`]: newCode, updatedAt: serverTimestamp() });
@@ -351,16 +442,10 @@ export default function Clash() {
   };
 
   const runCurrentCode = async () => {
-    if (!roomId || !currentQuestion?.id) return;
-
+    if (!roomId || !currentQuestion?.id || timerExpired) return;
     setRunState({ running: true, submitting: false, error: "", output: null });
     try {
-      const response = await runClashCode({
-        roomId,
-        questionId: currentQuestion.id,
-        code: myCode,
-        language,
-      });
+      const response = await runClashCode({ roomId, questionId: currentQuestion.id, code: myCode, language });
       setRunState({ running: false, submitting: false, error: "", output: response?.result || null });
     } catch (error) {
       setRunState({ running: false, submitting: false, error: error.message || "Run failed", output: null });
@@ -368,16 +453,10 @@ export default function Clash() {
   };
 
   const submitCurrentCode = async () => {
-    if (!roomId || !currentQuestion?.id) return;
-
+    if (!roomId || !currentQuestion?.id || timerExpired) return;
     setRunState({ running: false, submitting: true, error: "", output: null });
     try {
-      const response = await submitClashAnswer({
-        roomId,
-        questionId: currentQuestion.id,
-        code: myCode,
-        language,
-      });
+      const response = await submitClashAnswer({ roomId, questionId: currentQuestion.id, code: myCode, language });
       setRunState({ running: false, submitting: false, error: "", output: response?.result || null });
     } catch (error) {
       setRunState({ running: false, submitting: false, error: error.message || "Submit failed", output: null });
@@ -396,28 +475,19 @@ export default function Clash() {
   };
 
   const abortBattle = async () => {
-    if (!roomId || !playerRole) {
-      navigate("/dashboard");
-      return;
-    }
-
+    if (!roomId || !playerRole) { navigate("/dashboard"); return; }
     setRunState((prev) => ({ ...prev, error: "" }));
-
     try {
       const roomRef = doc(db, "battles", roomId);
       await updateDoc(roomRef, {
         status: "ABORTED",
-        abortedBy: {
-          uid: auth.currentUser?.uid || null,
-          name: auth.currentUser?.displayName || "A player",
-        },
+        abortedBy: { uid: auth.currentUser?.uid || null, name: auth.currentUser?.displayName || "A player" },
         updatedAt: serverTimestamp(),
       });
     } catch (error) {
       setRunState((prev) => ({ ...prev, error: error.message || "Could not abort battle" }));
       return;
     }
-
     navigate("/dashboard");
   };
 
@@ -428,14 +498,35 @@ export default function Clash() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const toggleQuestionSelection = (qId) => {
+    setSelectedQuestionIds((prev) =>
+      prev.includes(qId) ? prev.filter((id) => id !== qId) : [...prev, qId]
+    );
+  };
+
+  // ── Outcome calculation ──
+  const getOutcome = () => {
+    if (!roomData || !finalizedResult) return null;
+    const myUid = auth.currentUser?.uid;
+    const opponentUid = playerRole === "player1" ? roomData?.player2?.uid : roomData?.player1?.uid;
+    const myScore = roomData?.scores?.[myUid] || 0;
+    const opponentScore = roomData?.scores?.[opponentUid] || 0;
+    if (myScore > opponentScore) return "WON";
+    if (myScore < opponentScore) return "LOST";
+    return "TIE";
+  };
+
+  // ══════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════
   return (
     <div className="min-h-screen bg-[#050505] text-[#00ff41] font-mono selection:bg-[#00ff41] selection:text-black relative overflow-hidden">
       <div className="fixed inset-0 z-50 opacity-50 pointer-events-none mix-blend-overlay" style={{ background: "repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,65,0.1) 2px, rgba(0,255,65,0.1) 4px)" }} />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-emerald-900/20 via-[#050505] to-[#050505] pointer-events-none" />
 
       <AnimatePresence mode="wait">
-        
-        {/* BOOT SEQUENCE */}
+
+        {/* ── BOOT SEQUENCE ── */}
         {view === "BOOT" && (
           <motion.div key="boot" exit={{ opacity: 0, scale: 1.1 }} className="relative z-10 flex flex-col justify-end h-screen p-12 text-sm md:text-lg">
             <div className="max-w-2xl space-y-2 text-[#00ff41]/80 shadow-[0_0_10px_rgba(0,255,65,0.5)]">
@@ -448,37 +539,92 @@ export default function Clash() {
           </motion.div>
         )}
 
-        {/* LOBBY */}
+        {/* ── LOBBY ── */}
         {view === "LOBBY" && (
-          <motion.div key="lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 flex items-center justify-center h-screen">
-            <div className="w-full max-w-md p-8 border border-[#00ff41]/30 rounded-xl bg-black/50 backdrop-blur-md shadow-[0_0_40px_rgba(0,255,65,0.1)]">
+          <motion.div key="lobby" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="relative z-10 flex items-center justify-center min-h-screen py-12">
+            <div className="w-full max-w-lg p-8 border border-[#00ff41]/30 rounded-xl bg-black/50 backdrop-blur-md shadow-[0_0_40px_rgba(0,255,65,0.1)]">
               <div className="flex justify-center mb-6">
                 <Code2 className="w-12 h-12 animate-pulse drop-shadow-[0_0_15px_rgba(0,255,65,0.8)]" />
               </div>
               <h2 className="text-3xl font-bold text-center mb-8 tracking-widest uppercase drop-shadow-[0_0_10px_rgba(0,255,65,0.8)]">Arena Terminal</h2>
-              <div className="space-y-6">
+              <div className="space-y-5">
+
+                {/* Stack + Difficulty */}
                 <div className="grid grid-cols-2 gap-2">
                   <select value={stack} onChange={(e) => setStack(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
-                    <option value="DSA">DSA</option>
-                    <option value="JAVASCRIPT">JAVASCRIPT</option>
-                    <option value="PYTHON">PYTHON</option>
+                    {STACK_OPTIONS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
                   </select>
                   <select value={difficulty} onChange={(e) => setDifficulty(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
                     <option value="EASY">EASY</option>
                     <option value="MEDIUM">MEDIUM</option>
                     <option value="HARD">HARD</option>
                   </select>
+                </div>
+
+                {/* Language + Timer */}
+                <div className="grid grid-cols-2 gap-2">
                   <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
                     <option value="javascript">JAVASCRIPT</option>
                     <option value="python">PYTHON</option>
+                    <option value="cpp">C++</option>
+                    <option value="java">JAVA</option>
                   </select>
-                  <input type="number" min={1} max={5} value={questionCount} onChange={(e) => setQuestionCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase" placeholder="Q COUNT" />
+                  <select value={timerMinutes} onChange={(e) => setTimerMinutes(Number(e.target.value))} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                    {TIMER_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
                 </div>
-                <button onClick={handleCreateRoom} disabled={creatingBattle} className="w-full py-4 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest flex items-center justify-center gap-3 group shadow-[0_0_15px_rgba(0,255,65,0.2)] disabled:opacity-60 disabled:hover:bg-[#00ff41]/10 disabled:hover:text-[#00ff41]">
+
+                {/* Question Count (when not using manual questions) */}
+                {!useMyQuestions && (
+                  <div>
+                    <label className="text-[10px] tracking-widest uppercase text-[#00ff41]/60 mb-1 block">Question Count</label>
+                    <input type="number" min={1} max={5} value={questionCount} onChange={(e) => setQuestionCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))} className="w-full bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase" placeholder="Q COUNT" />
+                  </div>
+                )}
+
+                {/* Use My Questions Toggle */}
+                <div className="border border-[#00ff41]/20 rounded-lg p-3">
+                  <label className="flex items-center gap-3 cursor-pointer">
+                    <input type="checkbox" checked={useMyQuestions} onChange={(e) => setUseMyQuestions(e.target.checked)} className="accent-[#00ff41] w-4 h-4" />
+                    <span className="text-xs tracking-widest uppercase">Use My Questions</span>
+                  </label>
+
+                  {useMyQuestions && (
+                    <div className="mt-3 max-h-48 overflow-auto space-y-1">
+                      {loadingBank ? (
+                        <p className="text-[10px] text-[#00ff41]/50 flex items-center gap-2"><Loader2 className="w-3 h-3 animate-spin" /> Loading question bank...</p>
+                      ) : myQuestionBank.length === 0 ? (
+                        <p className="text-[10px] text-[#00ff41]/40">No questions found for {stack} • {difficulty}. Add some from the dashboard.</p>
+                      ) : (
+                        myQuestionBank.map((q) => (
+                          <label key={q.id} className={`flex items-start gap-2 cursor-pointer p-2 rounded border transition-all ${selectedQuestionIds.includes(q.id) ? "border-[#00ff41]/50 bg-[#00ff41]/5" : "border-[#00ff41]/10 hover:border-[#00ff41]/25"}`}>
+                            <input type="checkbox" checked={selectedQuestionIds.includes(q.id)} onChange={() => toggleQuestionSelection(q.id)} className="accent-[#00ff41] mt-0.5" />
+                            <div>
+                              <p className="text-xs">{q.title}</p>
+                              <p className="text-[10px] text-[#00ff41]/40">{(q.tags || []).join(", ")}</p>
+                            </div>
+                          </label>
+                        ))
+                      )}
+                      {selectedQuestionIds.length > 0 && (
+                        <p className="text-[10px] text-[#00ff41]/60 mt-2">{selectedQuestionIds.length} question(s) selected</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Create Button */}
+                <button
+                  onClick={handleCreateRoom}
+                  disabled={creatingBattle || (useMyQuestions && selectedQuestionIds.length === 0)}
+                  className="w-full py-4 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest flex items-center justify-center gap-3 group shadow-[0_0_15px_rgba(0,255,65,0.2)] disabled:opacity-60 disabled:hover:bg-[#00ff41]/10 disabled:hover:text-[#00ff41]"
+                >
                   <Terminal className="w-5 h-5" />
                   {creatingBattle ? "[ GENERATING BATTLE... ]" : "[ GENERATE NEW BATTLE ]"}
                 </button>
                 {runState.error && <p className="text-xs text-rose-400">{runState.error}</p>}
+
+                {/* Join Room */}
                 <div className="flex items-center gap-4 opacity-50">
                   <div className="flex-1 h-px bg-[#00ff41]/50" />
                   <span className="text-xs tracking-widest uppercase">or</span>
@@ -493,7 +639,7 @@ export default function Clash() {
           </motion.div>
         )}
 
-        {/* WAITING ROOM */}
+        {/* ── WAITING ROOM ── */}
         {view === "WAITING" && (
           <motion.div key="waiting" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 flex items-center justify-center h-screen">
             <div className="w-full max-w-lg text-center">
@@ -506,6 +652,9 @@ export default function Clash() {
                   {copied ? <CheckCircle2 className="w-6 h-6" /> : <Copy className="w-6 h-6" />}
                 </button>
               </div>
+              {timerMinutes > 0 && (
+                <p className="text-xs text-[#00ff41]/50 mb-4"><Clock className="w-3 h-3 inline mr-1" /> Battle timer: {timerMinutes} minutes</p>
+              )}
               <div className="flex items-center justify-center gap-3 text-sm opacity-70">
                 <Loader2 className="w-4 h-4 animate-spin" /> Listening on port 8080...
               </div>
@@ -513,6 +662,7 @@ export default function Clash() {
           </motion.div>
         )}
 
+        {/* ── ABORTED ── */}
         {view === "ABORTED" && (
           <motion.div key="aborted" initial={{ opacity: 0, scale: 0.96 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 flex items-center justify-center h-screen px-6">
             <div className="w-full max-w-xl rounded-2xl border border-rose-500/30 bg-black/70 p-10 text-center shadow-[0_0_40px_rgba(244,63,94,0.12)] backdrop-blur-md">
@@ -521,17 +671,106 @@ export default function Clash() {
               <p className="mb-8 text-sm leading-7 text-rose-100/75">
                 {(abortedInfo?.name || "Your opponent")} has left the battle.
               </p>
-              <button
-                onClick={() => navigate("/dashboard")}
-                className="border border-rose-400/40 px-6 py-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-200 transition-all hover:bg-rose-500/10"
-              >
+              <button onClick={() => navigate("/dashboard")} className="border border-rose-400/40 px-6 py-3 text-sm font-bold uppercase tracking-[0.25em] text-rose-200 transition-all hover:bg-rose-500/10">
                 Return To Dashboard
               </button>
             </div>
           </motion.div>
         )}
 
-        {/* BATTLE ARENA (SPLIT SCREEN) */}
+        {/* ── FINISHED (WIN / LOSE / TIE) ── */}
+        {view === "FINISHED" && (
+          <motion.div key="finished" initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="relative z-10 flex items-center justify-center min-h-screen px-6 py-12">
+            <div className="w-full max-w-2xl text-center">
+              {(() => {
+                const outcome = getOutcome();
+                const myUid = auth.currentUser?.uid;
+                const opponentUid = playerRole === "player1" ? roomData?.player2?.uid : roomData?.player1?.uid;
+                const myScore = roomData?.scores?.[myUid] || 0;
+                const opponentScore = roomData?.scores?.[opponentUid] || 0;
+
+                return (
+                  <>
+                    {/* Outcome Header */}
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 200, delay: 0.2 }}>
+                      {outcome === "WON" && (
+                        <div className="mb-8">
+                          <Trophy className="w-20 h-20 mx-auto mb-4 text-[#00ff41] drop-shadow-[0_0_30px_rgba(0,255,65,0.8)]" />
+                          <h2 className="text-4xl font-black uppercase tracking-[0.3em] text-[#00ff41] drop-shadow-[0_0_20px_rgba(0,255,65,0.6)]">
+                            Congratulations!
+                          </h2>
+                          <p className="text-xl font-bold text-[#00ff41]/80 mt-2 tracking-widest">YOU WON!</p>
+                        </div>
+                      )}
+                      {outcome === "LOST" && (
+                        <div className="mb-8">
+                          <AlertTriangle className="w-20 h-20 mx-auto mb-4 text-rose-400 drop-shadow-[0_0_20px_rgba(244,63,94,0.5)]" />
+                          <h2 className="text-4xl font-black uppercase tracking-[0.3em] text-rose-400">
+                            You Lost
+                          </h2>
+                          <p className="text-sm text-rose-300/60 mt-2">Better luck next time, hacker.</p>
+                        </div>
+                      )}
+                      {outcome === "TIE" && (
+                        <div className="mb-8">
+                          <Trophy className="w-20 h-20 mx-auto mb-4 text-amber-400 drop-shadow-[0_0_20px_rgba(245,158,11,0.5)]" />
+                          <h2 className="text-4xl font-black uppercase tracking-[0.3em] text-amber-400">
+                            It&apos;s a Tie!
+                          </h2>
+                          <p className="text-sm text-amber-300/60 mt-2">Equally matched hackers.</p>
+                        </div>
+                      )}
+                    </motion.div>
+
+                    {/* Score Cards */}
+                    <div className="grid grid-cols-2 gap-4 mb-8 max-w-md mx-auto">
+                      <div className={`p-6 rounded-xl border ${outcome === "WON" ? "border-[#00ff41]/40 bg-[#00ff41]/5" : "border-white/10 bg-white/5"}`}>
+                        <p className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-1">Your Score</p>
+                        <p className="text-4xl font-black">{myScore}</p>
+                      </div>
+                      <div className={`p-6 rounded-xl border ${outcome === "LOST" ? "border-rose-400/40 bg-rose-400/5" : "border-white/10 bg-white/5"}`}>
+                        <p className="text-xs uppercase tracking-widest text-rose-400/60 mb-1">Opponent</p>
+                        <p className="text-4xl font-black text-rose-400">{opponentScore}</p>
+                      </div>
+                    </div>
+
+                    {/* View Answers */}
+                    <button
+                      onClick={() => setShowAnswers(!showAnswers)}
+                      className="mb-6 px-6 py-2 border border-[#00ff41]/30 text-xs uppercase tracking-widest hover:bg-[#00ff41]/10 transition-all flex items-center gap-2 mx-auto"
+                    >
+                      <Eye className="w-3.5 h-3.5" />
+                      {showAnswers ? "Hide Answers" : "View Correct Answers"}
+                    </button>
+
+                    {showAnswers && (
+                      <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: "auto" }} className="mb-8 space-y-3 text-left max-w-lg mx-auto">
+                        {questions.map((q, idx) => (
+                          <div key={q.id || idx} className="border border-[#00ff41]/20 rounded-lg p-4 bg-black/50">
+                            <p className="text-xs font-bold mb-1">Q{idx + 1}: {q.title}</p>
+                            <p className="text-[10px] text-[#00ff41]/50 whitespace-pre-wrap">{q.description}</p>
+                          </div>
+                        ))}
+                      </motion.div>
+                    )}
+
+                    {/* CTA Buttons */}
+                    <div className="flex gap-3 justify-center">
+                      <button onClick={() => navigate("/clash")} className="px-6 py-3 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest text-sm">
+                        Play Again
+                      </button>
+                      <button onClick={() => navigate("/dashboard")} className="px-6 py-3 border border-[#00ff41]/30 hover:bg-[#00ff41]/10 transition-all font-bold tracking-widest text-sm">
+                        Dashboard
+                      </button>
+                    </div>
+                  </>
+                );
+              })()}
+            </div>
+          </motion.div>
+        )}
+
+        {/* ── BATTLE ARENA (SPLIT SCREEN) ── */}
         {view === "BATTLE" && (
           <motion.div key="battle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 flex flex-col h-screen">
             <header className="h-14 border-b border-[#00ff41]/20 bg-black/80 flex items-center justify-between px-6 shrink-0">
@@ -539,12 +778,30 @@ export default function Clash() {
                 <AlertTriangle className="w-5 h-5 text-rose-500 animate-pulse" />
                 <span className="font-bold tracking-widest uppercase text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]">Live Clash</span>
               </div>
-              <div className="text-2xl font-black tracking-widest drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]">ROOM: {roomId}</div>
+
+              {/* Timer Display */}
+              <div className="flex items-center gap-4">
+                {timeRemaining !== null && (
+                  <div className={`flex items-center gap-2 px-3 py-1 rounded border ${timeRemaining <= 60 ? "border-rose-500/50 text-rose-400 animate-pulse" : "border-amber-400/30 text-amber-300"}`}>
+                    <Clock className="w-3.5 h-3.5" />
+                    <span className="font-mono text-sm font-bold tracking-widest">{formatTime(timeRemaining)}</span>
+                  </div>
+                )}
+                <div className="text-2xl font-black tracking-widest drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]">ROOM: {roomId}</div>
+              </div>
+
               <div className="flex items-center gap-2">
-                <button onClick={finalizeBattle} className="text-xs border border-amber-400/50 text-amber-300 px-3 py-1 hover:bg-amber-400/20 uppercase tracking-widest">Finalize</button>
+                <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs border border-amber-400/50 text-amber-300 px-3 py-1 hover:bg-amber-400/20 uppercase tracking-widest disabled:opacity-50">Finalize</button>
                 <button onClick={abortBattle} className="text-xs border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41]/20 uppercase tracking-widest">Abort</button>
               </div>
             </header>
+
+            {/* Timer expired banner */}
+            {timerExpired && (
+              <div className="h-10 bg-rose-500/20 border-b border-rose-500/30 flex items-center justify-center text-xs uppercase tracking-widest text-rose-300 font-bold">
+                <Clock className="w-3.5 h-3.5 mr-2" /> Time&apos;s Up! Battle auto-finalized.
+              </div>
+            )}
 
             <div className="h-28 border-b border-[#00ff41]/20 bg-black/70 px-4 py-2 overflow-x-auto">
               <div className="flex items-center gap-2 mb-2 text-xs uppercase tracking-widest text-[#00ff41]/70">
@@ -572,31 +829,24 @@ export default function Clash() {
                   <span className="text-xs text-[#00ff41]/50">{auth.currentUser?.displayName || "Player 1"}</span>
                 </div>
                 <div className="min-h-0 flex-1 relative bg-[#050505]">
-                  <Editor height="100%" language={language} theme="vs-dark" value={myCode} onChange={(v) => handleCodeChange(v || "")} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 } }} />
+                  <Editor height="100%" language={language} theme="vs-dark" value={myCode} onChange={(v) => handleCodeChange(v || "")} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 }, readOnly: timerExpired }} />
                 </div>
                 <div className="border-t border-cyan-400/20 bg-black/95 p-4">
                   <OutputTerminal runState={runState} finalizedResult={finalizedResult} />
                 </div>
               </div>
 
-              {/* Opponent Preview */}
+              {/* Opponent Activity Panel */}
               <div className="relative flex min-h-[260px] w-full flex-col overflow-hidden border-t border-[#00ff41]/20 bg-black/75 xl:min-h-0 xl:w-[340px] xl:max-w-[340px] xl:border-l xl:border-t-0">
                 <div className="h-10 bg-black/80 border-b border-[#00ff41]/20 flex items-center px-4 justify-between">
                   <span className="text-xs font-bold tracking-widest uppercase text-rose-500 flex items-center gap-2 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" /> Network Intercept</span>
                   <span className="text-xs text-rose-500/50">{roomData?.player2?.name && playerRole === "player1" ? roomData.player2.name : roomData?.player1?.name && playerRole === "player2" ? roomData.player1.name : "Opponent"}</span>
                 </div>
-                <div className="relative min-h-0 flex-1 overflow-hidden bg-[#050505]">
-                  <div className="absolute inset-0 z-20 bg-[radial-gradient(circle_at_top,_rgba(244,63,94,0.12),_transparent_55%)]" />
-                  <div className="absolute right-3 top-3 z-30 rounded-full border border-rose-400/20 bg-black/60 px-3 py-1 text-[10px] uppercase tracking-[0.25em] text-rose-200/80 backdrop-blur-md">
-                    Obfuscated Feed
-                  </div>
-                  <div className="pointer-events-none absolute inset-0 z-20 backdrop-blur-[3px]" />
-                  <div className="absolute inset-0 scale-[1.02] opacity-75 blur-[7px]">
-                    <Editor height="100%" language={language} theme="vs-dark" value={opponentCode} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 14, padding: { top: 16 }, readOnly: true }} />
-                  </div>
+                <div className="relative min-h-0 flex-1 overflow-hidden">
+                  <OpponentActivity opponentCode={opponentCode} />
                 </div>
                 <div className="border-t border-rose-400/15 bg-rose-500/5 px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-rose-200/55">
-                  opponent source blurred for practical mode
+                  opponent activity feed • code hidden
                 </div>
               </div>
             </div>
@@ -611,11 +861,11 @@ export default function Clash() {
                 <div className="border border-[#00ff41]/20 rounded p-3 flex flex-col">
                   <div className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-2">Execute</div>
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={runCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion} className="py-2 border border-cyan-400/50 text-cyan-300 text-xs uppercase tracking-widest hover:bg-cyan-400/20 disabled:opacity-50 flex items-center justify-center gap-1">
+                    <button onClick={runCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion || timerExpired} className="py-2 border border-cyan-400/50 text-cyan-300 text-xs uppercase tracking-widest hover:bg-cyan-400/20 disabled:opacity-50 flex items-center justify-center gap-1">
                       <FlaskConical className="w-3.5 h-3.5" />
                       {runState.running ? "Running..." : "Run Code"}
                     </button>
-                    <button onClick={submitCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion} className="py-2 border border-[#00ff41]/50 text-[#00ff41] text-xs uppercase tracking-widest hover:bg-[#00ff41]/20 disabled:opacity-50 flex items-center justify-center gap-1">
+                    <button onClick={submitCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion || timerExpired} className="py-2 border border-[#00ff41]/50 text-[#00ff41] text-xs uppercase tracking-widest hover:bg-[#00ff41]/20 disabled:opacity-50 flex items-center justify-center gap-1">
                       <Send className="w-3.5 h-3.5" />
                       {runState.submitting ? "Submitting..." : "Submit"}
                     </button>

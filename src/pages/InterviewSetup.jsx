@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { BrainCircuit, ChevronRight, Zap, Target, Layers } from "lucide-react";
+import { BrainCircuit, ChevronRight, Zap, Target, Layers, AlignLeft, ListChecks } from "lucide-react";
 import Noise from "../components/Noise";
 import BackgroundGlow from "../components/BackgroundGlow";
 
@@ -55,15 +55,31 @@ const DIFFICULTIES = [
 
 const QUESTION_COUNTS = [3, 5, 8, 10];
 
+const QUESTION_TYPES = [
+  {
+    id: "subjective",
+    label: "Subjective",
+    description: "Open-ended answers, typed or spoken",
+    Icon: AlignLeft,
+  },
+  {
+    id: "mcq",
+    label: "MCQ",
+    description: "Multiple choice, pick the right option",
+    Icon: ListChecks,
+  },
+];
+
 export default function InterviewSetup() {
   const navigate = useNavigate();
   const [role, setRole] = useState("Frontend Engineer");
   const [difficulty, setDifficulty] = useState("Medium");
   const [questionCount, setQuestionCount] = useState(5);
+  const [questionType, setQuestionType] = useState("subjective");
 
   const handleStart = () => {
     navigate("/interview/room", {
-      state: { role, difficulty, questionCount },
+      state: { role, difficulty, questionCount, questionType },
     });
   };
 
@@ -175,6 +191,35 @@ export default function InterviewSetup() {
             </p>
           </div>
 
+          {/* Question Type */}
+          <div>
+            <label className="block mb-3 text-sm font-medium text-neutral-300">
+              Question Type
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {QUESTION_TYPES.map(({ id, label, description, Icon }) => {
+                const isActive = questionType === id;
+                return (
+                  <button
+                    key={id}
+                    onClick={() => setQuestionType(id)}
+                    className={`p-4 rounded-xl border transition-all duration-200 text-left ${
+                      isActive
+                        ? "bg-white/10 border-white/30"
+                        : "bg-white/[0.02] border-white/5 hover:text-white hover:border-white/15 hover:bg-white/[0.04]"
+                    }`}
+                  >
+                    <Icon className={`w-5 h-5 mb-2 ${isActive ? "text-emerald-400" : "text-neutral-600"}`} />
+                    <p className={`text-sm font-semibold ${isActive ? "text-white" : "text-neutral-400"}`}>
+                      {label}
+                    </p>
+                    <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Summary + Start */}
           <div className="pt-2">
             <div className="flex items-center justify-between mb-4 text-xs text-neutral-600 font-mono">
@@ -183,6 +228,8 @@ export default function InterviewSetup() {
               <span>{difficulty}</span>
               <span>·</span>
               <span>{questionCount} questions</span>
+              <span>·</span>
+              <span>{questionType === "mcq" ? "MCQ" : "Subjective"}</span>
             </div>
             <button
               onClick={handleStart}
