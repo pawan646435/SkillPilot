@@ -770,115 +770,226 @@ export default function Clash() {
           </motion.div>
         )}
 
-        {/* ── BATTLE ARENA (SPLIT SCREEN) ── */}
+        {/* ── BATTLE ARENA — LeetCode-style Split Layout ── */}
         {view === "BATTLE" && (
           <motion.div key="battle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="relative z-10 flex flex-col h-screen">
-            <header className="h-14 border-b border-[#00ff41]/20 bg-black/80 flex items-center justify-between px-6 shrink-0">
+
+            {/* ── Top Nav Bar ── */}
+            <header className="h-12 border-b border-white/10 bg-[#1a1a1a] flex items-center justify-between px-4 shrink-0">
               <div className="flex items-center gap-3">
-                <AlertTriangle className="w-5 h-5 text-rose-500 animate-pulse" />
-                <span className="font-bold tracking-widest uppercase text-rose-500 drop-shadow-[0_0_8px_rgba(244,63,94,0.8)]">Live Clash</span>
+                <button onClick={() => navigate("/dashboard")} className="text-neutral-400 hover:text-white text-xs">← Back</button>
+                <div className="w-px h-5 bg-white/10" />
+                <span className="text-xs font-semibold text-white/90">
+                  {roomData?.config?.stack || stack} • {roomData?.config?.difficulty || difficulty}
+                </span>
+                <span className="text-xs text-neutral-500 ml-1">ROOM: {roomId}</span>
               </div>
 
-              {/* Timer Display */}
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3">
+                {/* Timer */}
                 {timeRemaining !== null && (
-                  <div className={`flex items-center gap-2 px-3 py-1 rounded border ${timeRemaining <= 60 ? "border-rose-500/50 text-rose-400 animate-pulse" : "border-amber-400/30 text-amber-300"}`}>
-                    <Clock className="w-3.5 h-3.5" />
-                    <span className="font-mono text-sm font-bold tracking-widest">{formatTime(timeRemaining)}</span>
+                  <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-bold ${timeRemaining <= 60 ? "bg-rose-500/15 text-rose-400 animate-pulse" : "bg-amber-500/10 text-amber-300"}`}>
+                    <Clock className="w-3 h-3" />
+                    {formatTime(timeRemaining)}
                   </div>
                 )}
-                <div className="text-2xl font-black tracking-widest drop-shadow-[0_0_8px_rgba(0,255,65,0.8)]">ROOM: {roomId}</div>
-              </div>
 
-              <div className="flex items-center gap-2">
-                <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs border border-amber-400/50 text-amber-300 px-3 py-1 hover:bg-amber-400/20 uppercase tracking-widest disabled:opacity-50">Finalize</button>
-                <button onClick={abortBattle} className="text-xs border border-[#00ff41]/30 px-3 py-1 hover:bg-[#00ff41]/20 uppercase tracking-widest">Abort</button>
+                {/* Scores */}
+                <div className="flex items-center gap-1 text-[11px]">
+                  <span className="text-emerald-400 font-semibold">{roomData?.scores?.[auth.currentUser?.uid] || 0}</span>
+                  <span className="text-neutral-600">:</span>
+                  <span className="text-rose-400 font-semibold">{playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}</span>
+                </div>
+
+                <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs bg-amber-500/15 text-amber-300 px-3 py-1 rounded hover:bg-amber-500/25 disabled:opacity-40 font-medium">Finalize</button>
+                <button onClick={abortBattle} className="text-xs bg-rose-500/10 text-rose-400 px-3 py-1 rounded hover:bg-rose-500/20 font-medium">Abort</button>
               </div>
             </header>
 
             {/* Timer expired banner */}
             {timerExpired && (
-              <div className="h-10 bg-rose-500/20 border-b border-rose-500/30 flex items-center justify-center text-xs uppercase tracking-widest text-rose-300 font-bold">
-                <Clock className="w-3.5 h-3.5 mr-2" /> Time&apos;s Up! Battle auto-finalized.
+              <div className="h-9 bg-rose-500/15 border-b border-rose-500/20 flex items-center justify-center text-xs text-rose-300 font-medium gap-2">
+                <Clock className="w-3.5 h-3.5" /> Time&apos;s up! Battle auto-finalized.
               </div>
             )}
 
-            <div className="h-28 border-b border-[#00ff41]/20 bg-black/70 px-4 py-2 overflow-x-auto">
-              <div className="flex items-center gap-2 mb-2 text-xs uppercase tracking-widest text-[#00ff41]/70">
-                <Trophy className="w-3.5 h-3.5" />
-                Practical Clash • {roomData?.config?.stack || stack} • {roomData?.config?.difficulty || difficulty}
-              </div>
-              <div className="flex gap-2">
-                {questions.map((q, idx) => (
-                  <button
-                    key={q.id || idx}
-                    onClick={() => setCurrentQuestionIndex(idx)}
-                    className={`px-3 py-2 text-xs border rounded ${idx === currentQuestionIndex ? "border-[#00ff41] bg-[#00ff41]/10" : "border-[#00ff41]/30"}`}
-                  >
-                    Q{idx + 1} • {q.title || "Untitled"}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* ── Main Split: Problem | Editor+Output | Opponent ── */}
+            <div className="flex flex-1 overflow-hidden">
 
-            <div className="flex flex-1 flex-col overflow-hidden xl:flex-row">
-              {/* My Editor + Output */}
-              <div className="flex min-h-0 flex-[1.2] flex-col border-r border-[#00ff41]/20 relative">
-                <div className="h-10 bg-black/80 border-b border-[#00ff41]/20 flex items-center px-4 justify-between">
-                  <span className="flex items-center gap-2 text-xs font-bold tracking-widest uppercase"><div className="w-2 h-2 rounded-full bg-[#00ff41] animate-pulse" /> Local Terminal</span>
-                  <span className="text-xs text-[#00ff41]/50">{auth.currentUser?.displayName || "Player 1"}</span>
+              {/* ── LEFT: Problem Description ── */}
+              <div className="w-[380px] min-w-[300px] max-w-[460px] flex flex-col border-r border-white/10 bg-[#1e1e1e]">
+                {/* Question Tabs */}
+                <div className="border-b border-white/10 bg-[#252525] px-3 py-2 flex gap-1 overflow-x-auto shrink-0">
+                  {questions.map((q, idx) => (
+                    <button
+                      key={q.id || idx}
+                      onClick={() => setCurrentQuestionIndex(idx)}
+                      className={`px-3 py-1.5 text-xs rounded whitespace-nowrap transition-colors ${idx === currentQuestionIndex
+                        ? "bg-white/10 text-white font-medium"
+                        : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
+                      }`}
+                    >
+                      Q{idx + 1}
+                    </button>
+                  ))}
                 </div>
-                <div className="min-h-0 flex-1 relative bg-[#050505]">
-                  <Editor height="100%" language={language} theme="vs-dark" value={myCode} onChange={(v) => handleCodeChange(v || "")} options={{ minimap: { enabled: false }, fontFamily: 'JetBrains Mono', fontSize: 15, padding: { top: 16 }, readOnly: timerExpired }} />
-                </div>
-                <div className="border-t border-cyan-400/20 bg-black/95 p-4">
-                  <OutputTerminal runState={runState} finalizedResult={finalizedResult} />
+
+                {/* Problem Content */}
+                <div className="flex-1 overflow-auto p-5">
+                  {currentQuestion ? (
+                    <>
+                      <div className="flex items-center gap-2 mb-3">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-medium ${
+                          currentQuestion.difficulty === "EASY" ? "bg-emerald-500/15 text-emerald-400" :
+                          currentQuestion.difficulty === "HARD" ? "bg-rose-500/15 text-rose-400" :
+                          "bg-amber-500/15 text-amber-400"
+                        }`}>{currentQuestion.difficulty}</span>
+                        {currentQuestion.tags?.map((t) => (
+                          <span key={t} className="px-2 py-0.5 rounded bg-white/5 text-[10px] text-neutral-500">{t}</span>
+                        ))}
+                      </div>
+                      <h2 className="text-lg font-semibold text-white mb-4">
+                        {currentQuestionIndex + 1}. {currentQuestion.title}
+                      </h2>
+                      <div className="text-sm text-neutral-300 leading-relaxed whitespace-pre-wrap">
+                        {currentQuestion.description}
+                      </div>
+                    </>
+                  ) : (
+                    <p className="text-neutral-500 text-sm">No question loaded.</p>
+                  )}
                 </div>
               </div>
 
-              {/* Opponent Activity Panel */}
-              <div className="relative flex min-h-[260px] w-full flex-col overflow-hidden border-t border-[#00ff41]/20 bg-black/75 xl:min-h-0 xl:w-[340px] xl:max-w-[340px] xl:border-l xl:border-t-0">
-                <div className="h-10 bg-black/80 border-b border-[#00ff41]/20 flex items-center px-4 justify-between">
-                  <span className="text-xs font-bold tracking-widest uppercase text-rose-500 flex items-center gap-2 drop-shadow-[0_0_5px_rgba(244,63,94,0.5)]"><div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" /> Network Intercept</span>
-                  <span className="text-xs text-rose-500/50">{roomData?.player2?.name && playerRole === "player1" ? roomData.player2.name : roomData?.player1?.name && playerRole === "player2" ? roomData.player1.name : "Opponent"}</span>
+              {/* ── CENTER: Code Editor + Output ── */}
+              <div className="flex-1 flex flex-col min-w-0">
+                {/* Editor Header with Language Selector */}
+                <div className="h-10 bg-[#252525] border-b border-white/10 flex items-center justify-between px-3 shrink-0">
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={language}
+                      onChange={(e) => {
+                        const newLang = e.target.value;
+                        setLanguage(newLang);
+                        setMyCode(getStarterCode(currentQuestion, newLang));
+                        if (roomId && playerRole) {
+                          const roomRef = doc(db, "battles", roomId);
+                          updateDoc(roomRef, {
+                            [`${playerRole}.language`]: newLang,
+                            [`${playerRole}.code`]: getStarterCode(currentQuestion, newLang),
+                            "config.language": newLang,
+                            updatedAt: serverTimestamp(),
+                          });
+                        }
+                      }}
+                      disabled={timerExpired}
+                      className="bg-[#333] text-neutral-200 text-xs px-2.5 py-1 rounded border border-white/10 focus:outline-none focus:border-white/25 disabled:opacity-50"
+                    >
+                      <option value="javascript">JavaScript</option>
+                      <option value="python">Python</option>
+                      <option value="cpp">C++</option>
+                      <option value="java">Java</option>
+                    </select>
+                  </div>
+                  <span className="text-[10px] text-neutral-600">{auth.currentUser?.displayName || "Player 1"}</span>
                 </div>
-                <div className="relative min-h-0 flex-1 overflow-hidden">
+
+                {/* Code Editor */}
+                <div className="flex-1 min-h-0 bg-[#1e1e1e]">
+                  <Editor
+                    height="100%"
+                    language={language === "cpp" ? "cpp" : language}
+                    theme="vs-dark"
+                    value={myCode}
+                    onChange={(v) => handleCodeChange(v || "")}
+                    options={{
+                      minimap: { enabled: false },
+                      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+                      fontSize: 14,
+                      lineHeight: 21,
+                      padding: { top: 12 },
+                      readOnly: timerExpired,
+                      scrollBeyondLastLine: false,
+                      renderLineHighlight: "gutter",
+                      cursorBlinking: "smooth",
+                    }}
+                  />
+                </div>
+
+                {/* Bottom Bar: Run/Submit + Output */}
+                <div className="border-t border-white/10 bg-[#1a1a1a]">
+                  {/* Action Buttons */}
+                  <div className="flex items-center justify-between border-b border-white/8 px-3 py-2">
+                    <div className="flex items-center gap-3 text-[11px]">
+                      <span className="text-neutral-500">Score:</span>
+                      <span className="text-emerald-400 font-semibold">{roomData?.scores?.[auth.currentUser?.uid] || 0}</span>
+                      <span className="text-neutral-600">|</span>
+                      <span className="text-neutral-500">Opponent:</span>
+                      <span className="text-rose-400 font-semibold">{playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={runCurrentCode}
+                        disabled={runState.running || runState.submitting || !currentQuestion || timerExpired}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-white/5 border border-white/10 text-neutral-300 text-xs rounded hover:bg-white/10 disabled:opacity-40 transition-colors"
+                      >
+                        <FlaskConical className="w-3 h-3" />
+                        {runState.running ? "Running..." : "Run"}
+                      </button>
+                      <button
+                        onClick={submitCurrentCode}
+                        disabled={runState.running || runState.submitting || !currentQuestion || timerExpired}
+                        className="flex items-center gap-1.5 px-4 py-1.5 bg-emerald-600 text-white text-xs rounded font-medium hover:bg-emerald-500 disabled:opacity-40 transition-colors"
+                      >
+                        <Send className="w-3 h-3" />
+                        {runState.submitting ? "Submitting..." : "Submit"}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Output Panel */}
+                  <div className="max-h-[180px] overflow-auto px-4 py-3 text-[11px] font-mono leading-5 text-neutral-400">
+                    {runState.running && <p className="text-cyan-400">▸ Running test harness...</p>}
+                    {runState.submitting && <p className="text-emerald-400">▸ Submitting solution...</p>}
+                    {runState.error && <p className="text-rose-400">✕ {runState.error}</p>}
+                    {!runState.error && !runState.running && !runState.submitting && !runState.output && (
+                      <p className="text-neutral-600">Run code or submit to see results</p>
+                    )}
+                    {runState.output && (
+                      <>
+                        <p className="text-emerald-400 mb-2">
+                          ✓ Passed {runState.output.passed}/{runState.output.total} • {runState.output.elapsedMs}ms • {runState.output.points} pts
+                        </p>
+                        {(runState.output.cases || []).filter((c) => !c.hidden).map((item) => (
+                          <div key={`c-${item.index}`} className="mb-1.5 pl-2 border-l-2 border-white/10">
+                            <span className={item.passed ? "text-emerald-400" : "text-rose-400"}>
+                              {item.passed ? "✓" : "✕"} Case {item.index + 1}
+                            </span>
+                            {"expected" in item && <span className="text-neutral-500 ml-2">expected: {formatTerminalValue(item.expected)}</span>}
+                            {"output" in item && <span className="text-neutral-500 ml-2">got: {formatTerminalValue(item.output)}</span>}
+                            {item.error && <span className="text-rose-400 ml-2">{item.error}</span>}
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── RIGHT: Opponent Activity Sidebar ── */}
+              <div className="w-[220px] min-w-[180px] max-w-[260px] flex flex-col border-l border-white/10 bg-[#1a1a1a]">
+                <div className="h-10 bg-[#252525] border-b border-white/10 flex items-center px-3 gap-2 shrink-0">
+                  <div className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                  <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-wider">Opponent</span>
+                  <span className="text-[10px] text-neutral-600 ml-auto truncate">
+                    {playerRole === "player1" ? (roomData?.player2?.name || "...") : (roomData?.player1?.name || "...")}
+                  </span>
+                </div>
+                <div className="flex-1 min-h-0 overflow-hidden">
                   <OpponentActivity opponentCode={opponentCode} />
                 </div>
-                <div className="border-t border-rose-400/15 bg-rose-500/5 px-4 py-3 text-[10px] uppercase tracking-[0.22em] text-rose-200/55">
-                  opponent activity feed • code hidden
-                </div>
-              </div>
-            </div>
-
-            <div className="border-t border-[#00ff41]/20 bg-black/90 p-4 overflow-auto">
-              <div className="grid min-h-[220px] grid-cols-1 gap-4 md:grid-cols-3">
-                <div className="md:col-span-2 border border-[#00ff41]/20 rounded p-3 overflow-auto">
-                  <div className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-2">Current Question</div>
-                  <h3 className="text-sm font-bold mb-2">{currentQuestion?.title || "No question selected"}</h3>
-                  <p className="text-xs text-[#00ff41]/70 whitespace-pre-wrap">{currentQuestion?.description || "Choose a clash format and start a room."}</p>
-                </div>
-                <div className="border border-[#00ff41]/20 rounded p-3 flex flex-col">
-                  <div className="text-xs uppercase tracking-widest text-[#00ff41]/60 mb-2">Execute</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button onClick={runCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion || timerExpired} className="py-2 border border-cyan-400/50 text-cyan-300 text-xs uppercase tracking-widest hover:bg-cyan-400/20 disabled:opacity-50 flex items-center justify-center gap-1">
-                      <FlaskConical className="w-3.5 h-3.5" />
-                      {runState.running ? "Running..." : "Run Code"}
-                    </button>
-                    <button onClick={submitCurrentCode} disabled={runState.running || runState.submitting || !currentQuestion || timerExpired} className="py-2 border border-[#00ff41]/50 text-[#00ff41] text-xs uppercase tracking-widest hover:bg-[#00ff41]/20 disabled:opacity-50 flex items-center justify-center gap-1">
-                      <Send className="w-3.5 h-3.5" />
-                      {runState.submitting ? "Submitting..." : "Submit"}
-                    </button>
-                  </div>
-                  <div className="mt-2 text-[11px] text-[#00ff41]/60">
-                    My Score: {roomData?.scores?.[auth.currentUser?.uid] || 0}
-                  </div>
-                  <div className="text-[11px] text-rose-300/70 mb-2">
-                    Opponent Score: {playerRole === "player1" ? (roomData?.scores?.[roomData?.player2?.uid] || 0) : (roomData?.scores?.[roomData?.player1?.uid] || 0)}
-                  </div>
-                  <div className="mt-auto text-[11px] text-neutral-300/50 border border-white/10 rounded p-3">
-                    Results stream in the output terminal beside your editor.
-                  </div>
+                <div className="border-t border-white/8 px-3 py-2 text-[10px] text-neutral-600 text-center">
+                  Code hidden
                 </div>
               </div>
             </div>
