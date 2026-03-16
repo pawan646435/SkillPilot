@@ -27,6 +27,8 @@ const TIMER_OPTIONS = [
   { value: 15, label: "15 min" },
   { value: 20, label: "20 min" },
   { value: 30, label: "30 min" },
+  { value: 45, label: "45 min" },
+  { value: 60, label: "60 min" },
 ];
 
 const DEFAULT_CODE_BY_LANGUAGE = {
@@ -561,24 +563,34 @@ export default function Clash() {
                   </select>
                 </div>
 
-                {/* Language + Timer */}
-                <div className="grid grid-cols-2 gap-2">
-                  <select value={language} onChange={(e) => setLanguage(e.target.value)} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                {/* Language */}
+                <div>
+                  <label className="text-[10px] tracking-widest uppercase text-[#00ff41]/60 mb-1 block">Language</label>
+                  <select value={language} onChange={(e) => setLanguage(e.target.value)} className="w-full bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
                     <option value="javascript">JAVASCRIPT</option>
                     <option value="python">PYTHON</option>
                     <option value="cpp">C++</option>
                     <option value="java">JAVA</option>
                   </select>
-                  <select value={timerMinutes} onChange={(e) => setTimerMinutes(Number(e.target.value))} className="bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
-                    {TIMER_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
                 </div>
 
-                {/* Question Count (when not using manual questions) */}
+                {/* Question Count + Timer */}
                 {!useMyQuestions && (
-                  <div>
-                    <label className="text-[10px] tracking-widest uppercase text-[#00ff41]/60 mb-1 block">Question Count</label>
-                    <input type="number" min={1} max={5} value={questionCount} onChange={(e) => setQuestionCount(Math.max(1, Math.min(5, Number(e.target.value) || 1)))} className="w-full bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase" placeholder="Q COUNT" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-[10px] tracking-widest uppercase text-[#00ff41]/60 mb-1 block">Questions</label>
+                      <select value={questionCount} onChange={(e) => setQuestionCount(Number(e.target.value))} className="w-full bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                        {[1,2,3,4,5,6,7,8,9,10].map((n) => (
+                          <option key={n} value={n}>{n} {n === 1 ? "Question" : "Questions"}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] tracking-widest uppercase text-[#00ff41]/60 mb-1 block">Timer</label>
+                      <select value={timerMinutes} onChange={(e) => setTimerMinutes(Number(e.target.value))} className="w-full bg-black border border-[#00ff41]/30 px-3 py-2 text-xs tracking-widest uppercase">
+                        {TIMER_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                      </select>
+                    </div>
                   </div>
                 )}
 
