@@ -1,6 +1,7 @@
 // src/pages/Clash.jsx
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
-import { AnimatePresence } from "framer-motion";
+// eslint-disable-next-line no-unused-vars
+import { motion, AnimatePresence } from "framer-motion";
 import { Terminal, Users, Copy, CheckCircle2, Code2, AlertTriangle, Loader2, FlaskConical, Send, Trophy, Clock, Eye } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
