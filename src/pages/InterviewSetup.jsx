@@ -1,7 +1,7 @@
 // src/pages/InterviewSetup.jsx
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { motion } from "framer-motion";
+import { motion as Motion } from "framer-motion";
 import { BrainCircuit, ChevronRight, Zap, Target, Layers, AlignLeft, ListChecks } from "lucide-react";
 import Noise from "../components/Noise";
 import BackgroundGlow from "../components/BackgroundGlow";
@@ -90,7 +90,7 @@ export default function InterviewSetup() {
 
       <div className="relative z-10 w-full max-w-2xl px-6 py-16 mx-auto">
         {/* Header */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
@@ -105,10 +105,10 @@ export default function InterviewSetup() {
           <p className="text-neutral-400 text-sm max-w-sm mx-auto leading-relaxed">
             Practice with an AI interviewer that adapts to your role and gives real-time feedback on every answer.
           </p>
-        </motion.div>
+        </Motion.div>
 
         {/* Config Card */}
-        <motion.div
+        <Motion.div
           initial={{ opacity: 0, y: 24 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5, delay: 0.1 }}
@@ -197,23 +197,23 @@ export default function InterviewSetup() {
               Question Type
             </label>
             <div className="grid grid-cols-2 gap-3">
-              {QUESTION_TYPES.map(({ id, label, description, Icon }) => {
-                const isActive = questionType === id;
+              {QUESTION_TYPES.map((type) => {
+                const isActive = questionType === type.id;
                 return (
                   <button
-                    key={id}
-                    onClick={() => setQuestionType(id)}
+                    key={type.id}
+                    onClick={() => setQuestionType(type.id)}
                     className={`p-4 rounded-xl border transition-all duration-200 text-left ${
                       isActive
                         ? "bg-white/10 border-white/30"
                         : "bg-white/[0.02] border-white/5 hover:text-white hover:border-white/15 hover:bg-white/[0.04]"
                     }`}
                   >
-                    <Icon className={`w-5 h-5 mb-2 ${isActive ? "text-emerald-400" : "text-neutral-600"}`} />
+                    <type.Icon className={`w-5 h-5 mb-2 ${isActive ? "text-emerald-400" : "text-neutral-600"}`} />
                     <p className={`text-sm font-semibold ${isActive ? "text-white" : "text-neutral-400"}`}>
-                      {label}
+                      {type.label}
                     </p>
-                    <p className="mt-0.5 text-xs text-neutral-600">{description}</p>
+                    <p className="mt-0.5 text-xs text-neutral-600">{type.description}</p>
                   </button>
                 );
               })}
@@ -239,7 +239,7 @@ export default function InterviewSetup() {
               <ChevronRight className="w-4 h-4" />
             </button>
           </div>
-        </motion.div>
+        </Motion.div>
       </div>
     </div>
   );

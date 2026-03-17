@@ -1,7 +1,7 @@
 // src/pages/InterviewRoom.jsx
 import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion as Motion, AnimatePresence } from "framer-motion";
 import {
   Mic, MicOff, Send, Loader2, ChevronRight,
   BrainCircuit, Lightbulb, X
@@ -216,7 +216,7 @@ export default function InterviewRoom() {
 
       {/* Top progress bar */}
       <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-white/5">
-        <motion.div
+        <Motion.div
           className="h-full bg-emerald-400"
           initial={{ width: 0 }}
           animate={{ width: `${progress}%` }}
@@ -254,7 +254,7 @@ export default function InterviewRoom() {
           {/* Error Banner */}
           <AnimatePresence>
             {error && (
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -10 }}
@@ -262,14 +262,14 @@ export default function InterviewRoom() {
               >
                 <span>{error}</span>
                 <button onClick={() => setError(null)}><X className="w-4 h-4" /></button>
-              </motion.div>
+              </Motion.div>
             )}
           </AnimatePresence>
 
           {/* Question Card */}
           <AnimatePresence mode="wait">
             {phase === PHASE.LOADING_QUESTION ? (
-              <motion.div
+              <Motion.div
                 key="loading"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -281,9 +281,9 @@ export default function InterviewRoom() {
                   <div className="w-3/4 h-4 rounded-lg bg-white/5 animate-pulse" />
                   <div className="w-1/2 h-4 rounded-lg bg-white/5 animate-pulse" />
                 </div>
-              </motion.div>
+              </Motion.div>
             ) : currentQuestion ? (
-              <motion.div
+              <Motion.div
                 key={`q-${questionIndex}`}
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -317,26 +317,26 @@ export default function InterviewRoom() {
                     </button>
                     <AnimatePresence>
                       {showHint && (
-                        <motion.p
+                        <Motion.p
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: "auto" }}
                           exit={{ opacity: 0, height: 0 }}
                           className="mt-2 text-xs italic text-amber-400/70"
                         >
                           💡 {currentQuestion.hint}
-                        </motion.p>
+                        </Motion.p>
                       )}
                     </AnimatePresence>
                   </div>
                 )}
-              </motion.div>
+              </Motion.div>
             ) : null}
           </AnimatePresence>
 
           {/* Answer Area */}
           <AnimatePresence mode="wait">
             {(phase === PHASE.ANSWERING || phase === PHASE.EVALUATING) && (
-              <motion.div
+              <Motion.div
                 key="answer-area"
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -379,7 +379,7 @@ export default function InterviewRoom() {
                     />
                     {isListening && (
                       <div className="absolute flex items-center gap-2 top-4 right-4">
-                        <motion.div
+                        <Motion.div
                           animate={{ scale: [1, 1.3, 1] }}
                           transition={{ duration: 1, repeat: Infinity }}
                           className="w-2 h-2 rounded-full bg-rose-400"
@@ -428,14 +428,14 @@ export default function InterviewRoom() {
                     )}
                   </button>
                 </div>
-              </motion.div>
+              </Motion.div>
             )}
           </AnimatePresence>
 
           {/* Evaluation Result */}
           <AnimatePresence>
             {phase === PHASE.SHOWING_RESULT && evaluation && (
-              <motion.div
+              <Motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
@@ -496,13 +496,13 @@ export default function InterviewRoom() {
                   {questionIndex + 1 >= questionCount ? "Finish & See Report" : "Next Question"}
                   <ChevronRight className="w-4 h-4" />
                 </button>
-              </motion.div>
+              </Motion.div>
             )}
           </AnimatePresence>
 
           {/* Generating Report State */}
           {phase === PHASE.GENERATING_REPORT && (
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               className="p-8 rounded-2xl bg-white/[0.03] border border-white/10 flex flex-col items-center gap-4 text-center"
@@ -512,7 +512,7 @@ export default function InterviewRoom() {
                 <p className="font-semibold text-white font-display">Generating your report...</p>
                 <p className="mt-1 text-sm text-neutral-500">Analysing all {questionCount} answers</p>
               </div>
-            </motion.div>
+            </Motion.div>
           )}
 
         </div>
