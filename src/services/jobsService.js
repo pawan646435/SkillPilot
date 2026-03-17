@@ -25,7 +25,7 @@ function toJobId(value) {
   return String(value || "").trim();
 }
 
-export async function getJobsFromProxy(category, region = "global") {
+export async function getJobsFromProxy(category) {
   const selectedCategory =
     typeof category === "object"
       ? category
@@ -35,7 +35,7 @@ export async function getJobsFromProxy(category, region = "global") {
     const { data } = await fetchJobsProxy({
       category: selectedCategory.id,
       role: selectedCategory.role,
-      region,
+      region: "india",
     });
 
     return data || {};
@@ -43,7 +43,7 @@ export async function getJobsFromProxy(category, region = "global") {
     console.error("fetchJobs callable failed:", error);
     return {
       category: selectedCategory.id,
-      region,
+      region: "india",
       role: selectedCategory.role,
       jobs: [],
       fetchedAt: null,

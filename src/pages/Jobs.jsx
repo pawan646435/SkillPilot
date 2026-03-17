@@ -227,7 +227,6 @@ export default function Jobs() {
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
   const [dataSource, setDataSource] = useState(null);
   const [activeCategory, setActiveCategory] = useState(JOB_CATEGORIES[0]);
-  const [region, setRegion] = useState("global");
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -283,7 +282,7 @@ export default function Jobs() {
       setError(null);
 
       try {
-        const data = await getJobsFromProxy(activeCategory, region);
+        const data = await getJobsFromProxy(activeCategory);
 
         if (!active) {
           return;
@@ -308,7 +307,7 @@ export default function Jobs() {
     return () => {
       active = false;
     };
-  }, [activeCategory, region]);
+  }, [activeCategory]);
 
   const savedCount = useMemo(
     () => Object.values(savedJobIds).filter(Boolean).length,
@@ -368,7 +367,7 @@ export default function Jobs() {
     setError(null);
 
     try {
-      const data = await getJobsFromProxy(activeCategory, region);
+      const data = await getJobsFromProxy(activeCategory);
       setJobs(Array.isArray(data.jobs) ? data.jobs : []);
       setLastFetchedAt(data.fetchedAt || null);
       setDataSource(data.source || null);
@@ -392,10 +391,10 @@ export default function Jobs() {
                 Live cache + Remotive feed
               </div>
               <h1 className="mb-4 text-4xl font-semibold tracking-tight text-white font-display md:text-6xl">
-                Discover remote tech roles without leaving SkillPilot.
+                Discover tech roles in India without leaving SkillPilot.
               </h1>
               <p className="max-w-2xl text-base leading-8 text-neutral-300 md:text-lg">
-                Browse curated remote openings across engineering, DevOps, data,
+                Browse curated openings across engineering, DevOps, data,
                 product, and design. Jobs are served through Firebase-backed cache
                 refreshes for fast responses and smoother browsing.
               </p>
@@ -439,48 +438,18 @@ export default function Jobs() {
               );
             })}
           </div>
-
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            <span className="text-[11px] font-mono uppercase tracking-[0.22em] text-neutral-500">
-              Search region
-            </span>
-            <button
-              type="button"
-              onClick={() => setRegion("global")}
-              className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                region === "global"
-                  ? "bg-emerald-400 text-black"
-                  : "border border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
-              }`}
-            >
-              Global
-            </button>
-            <button
-              type="button"
-              onClick={() => setRegion("india")}
-              className={`rounded-2xl px-4 py-2.5 text-sm font-semibold transition-colors ${
-                region === "india"
-                  ? "bg-emerald-400 text-black"
-                  : "border border-white/10 bg-white/[0.03] text-neutral-300 hover:bg-white/[0.07]"
-              }`}
-            >
-              India only
-            </button>
-          </div>
         </section>
 
         <section className="mb-8 flex flex-col gap-4 rounded-[30px] border border-white/8 bg-white/[0.025] px-6 py-5 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-sm font-medium text-white">
-              Powered by Remotive remote job listings
+              Powered by JSearch job listings
             </p>
             <p className="text-sm text-neutral-400">
               {dataSource === "cache"
                 ? "Jobs were served from Firestore cache."
                 : dataSource === "upstream"
-                  ? region === "global"
-                    ? "Jobs were freshly synced from JSearch and layered with Remotive remote listings."
-                    : "Jobs were freshly synced from JSearch."
+                  ? "Jobs were freshly synced from JSearch."
                   : dataSource === "stale-cache"
                     ? "Upstream providers were unavailable, so stale cached jobs are being shown."
                     : dataSource === "provider-unavailable"
@@ -491,7 +460,7 @@ export default function Jobs() {
 
           <div className="flex items-center gap-3 text-sm text-neutral-400">
             <a
-              href="https://remotive.com/remote-jobs/api"
+              href="https://rapidapi.com/letscrape-6bRBa3Q3OEd/api/jsearch"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-2xl border border-white/10 px-4 py-2.5 hover:text-white"
@@ -523,7 +492,7 @@ export default function Jobs() {
         {loading ? (
           <JobsSkeleton />
         ) : visibleJobs.length === 0 ? (
-          <JobsEmpty categoryLabel={activeCategory.label} region={region} />
+          <JobsEmpty categoryLabel={activeCategory.label} region="india" />
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleJobs.map((job, index) => (
