@@ -86,7 +86,7 @@ function JobsSkeleton() {
   );
 }
 
-function JobsEmpty({ categoryLabel, region }) {
+function JobsEmpty({ categoryLabel }) {
   return (
     <div className="rounded-[28px] border border-white/10 bg-white/[0.03] p-10 text-center">
       <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-400/10 text-emerald-300">
@@ -96,9 +96,7 @@ function JobsEmpty({ categoryLabel, region }) {
         No jobs found right now
       </h3>
       <p className="mx-auto max-w-xl text-sm leading-7 text-neutral-400">
-        {region === "india"
-          ? `There are no cached ${categoryLabel} roles for India right now. Try the global feed or switch to another category.`
-          : `There are no cached ${categoryLabel} roles at the moment. Try again in a few minutes or switch to another category.`}
+        There are no cached {categoryLabel} roles for India right now. Try again in a few minutes or switch to another category.
       </p>
     </div>
   );
@@ -198,9 +196,7 @@ function JobCard({ job, index, isSaved, saving, onToggleSave }) {
 
       <div className="mt-auto flex items-center justify-between gap-3">
         <p className="text-xs leading-6 text-neutral-500">
-          {job.source === "remotive"
-            ? "Remote listing syndicated from Remotive."
-            : "Search result delivered through JSearch."}
+          Search result delivered through JSearch.
         </p>
         <a
           href={job.url || "#"}
@@ -388,7 +384,7 @@ export default function Jobs() {
             <div className="max-w-3xl">
               <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-mono uppercase tracking-[0.22em] text-emerald-300">
                 <Database className="h-3.5 w-3.5" />
-                Live cache + Remotive feed
+                Live cache + JSearch feed
               </div>
               <h1 className="mb-4 text-4xl font-semibold tracking-tight text-white font-display md:text-6xl">
                 Discover tech roles in India without leaving SkillPilot.
@@ -492,7 +488,7 @@ export default function Jobs() {
         {loading ? (
           <JobsSkeleton />
         ) : visibleJobs.length === 0 ? (
-          <JobsEmpty categoryLabel={activeCategory.label} region="india" />
+          <JobsEmpty categoryLabel={activeCategory.label} />
         ) : (
           <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
             {visibleJobs.map((job, index) => (
