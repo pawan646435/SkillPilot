@@ -469,27 +469,6 @@ export default function Clash() {
       const response = await submitClashAnswer({ roomId, questionId: currentQuestion.id, code: myCode, language });
       const res = response?.result || null;
       setRunState({ running: false, submitting: false, error: "", output: res });
-      
-      if (res && res.passed === res.total && res.total > 0) {
-        if (currentQuestionIndex < questions.length - 1) {
-          setTimeout(() => {
-            const nextIdx = currentQuestionIndex + 1;
-            setCurrentQuestionIndex(nextIdx);
-            const nextQ = questions[nextIdx];
-            const savedLocal = codeMap[nextQ.id];
-            // Since we're in a setTimeout closure, get the latest submissions via db directly or rely on roomData state capture.
-            // A quick re-render might have happened, but roomData from closure is fine since submissions don't change unprompted.
-            const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
-            const submittedCode = mySubmissions[nextQ.id]?.code;
-            const targetCode = savedLocal ?? submittedCode ?? getStarterCode(nextQ, language);
-            setMyCode(targetCode);
-            if (roomId && playerRole) {
-              const roomRef = doc(db, "battles", roomId);
-              updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
-            }
-          }, 1500);
-        }
-      }
     } catch (error) {
       setRunState({ running: false, submitting: false, error: error.message || "Submit failed", output: null });
     }
@@ -1007,6 +986,28 @@ export default function Clash() {
                         <Send className="w-3 h-3" />
                         {runState.submitting ? "Submitting..." : "Submit"}
                       </button>
+                      {runState.output && runState.output.passed === runState.output.total && runState.output.total > 0 && currentQuestionIndex < questions.length - 1 && (
+                        <button
+                          onClick={() => {
+                            const nextIdx = currentQuestionIndex + 1;
+                            setCurrentQuestionIndex(nextIdx);
+                            const nextQ = questions[nextIdx];
+                            const savedLocal = codeMap[nextQ.id];
+                            const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
+                            const submittedCode = mySubmissions[nextQ.id]?.code;
+                            const targetCode = savedLocal ?? submittedCode ?? getStarterCode(nextQ, language);
+                            setMyCode(targetCode);
+                            if (roomId && playerRole) {
+                              const roomRef = doc(db, "battles", roomId);
+                              updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
+                            }
+                            setRunState({ running: false, submitting: false, error: "", output: null });
+                          }}
+                          className="flex items-center gap-1.5 px-4 py-1.5 bg-cyan-600 text-white text-xs font-medium rounded hover:bg-cyan-500 transition-colors"
+                        >
+                          Next Question ➔
+                        </button>
+                      )}
                       {currentQuestionIndex === questions.length - 1 && (
                         <button
                           onClick={finalizeBattle}
