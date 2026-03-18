@@ -1,151 +1,90 @@
-# SkillPilot
+# SkillPilot 🚀
 
-SkillPilot is a React + Vite platform for interview preparation, coding assessments, and competitive coding experiences.
+SkillPilot is a sophisticated, AI-enhanced platform designed for modern interview preparation, coding assessments, and competitive real-time coding experiences. It bridges the gap between learning and hiring by providing high-fidelity simulations for both candidates and recruiters.
 
-It includes:
+---
 
-- Public landing experience with authentication
-- AI interview flow (setup, live interview room, final report)
-- Dashboard for assessments, problems, candidates, and settings
-- Public tech news feed with personalization and saved articles
+## 🏗️ Project Architecture
 
-## Tech Stack
+SkillPilot follows a modern **Serverless/Micro-Backend architecture** designed for scalability and low-latency real-time interactions:
 
-- React 19
-- React Router 7
-- Vite 7
-- Firebase (Auth, Firestore, Storage)
-- Framer Motion
-- Tailwind CSS
-- Lucide React
+- **Frontend Hub**: A high-performance Single Page Application (SPA) built with React and Vite. It leverages real-time listeners for collaborative features (like Code Battles) and a modular component system for a premium user experience.
+- **Backend Infrastructure**: Powered by **Firebase Cloud Functions (Generation 2)**. This layer acts as a secure proxy to sensitive external APIs and handles complex server-side logic (e.g., code evaluation, AI interview processing, scheduling).
+- **Real-time Engine**: Utilizes **Firestore** for multi-user synchronization in Code Battles and high-availability data storage.
+- **AI Domain**: Integrates **LLM (Groq)** via proxy functions to handle live interview persona simulation and final feedback reporting.
 
-## Scripts
+---
 
-```bash
-npm run dev      # Start development server
-npm run build    # Create production build
-npm run preview  # Preview production build
-npm run lint     # Run ESLint
-```
+## 🛠️ Tech Stack
 
-## Environment Variables
+### Frontend
+- **Core**: React 19 + Vite 7 (High-speed HMR and build optimization)
+- **Styling**: Vanilla CSS + Tailwind CSS (Custom glassmorphism design system)
+- **Animations**: Framer Motion (Fluid transitions and micro-interactions)
+- **Icons**: Lucide React
+- **Editor**: Monaco Editor (The core of VS Code) for the IDE experience
 
-The frontend no longer uses `VITE_GROQ_API_KEY` or `VITE_GNEWS_API_KEY`.
+### Backend & Infrastructure
+- **Cloud Provider**: Google Firebase (deployed in `asia-south1`)
+- **Serverless**: Firebase Cloud Functions (Node.js)
+- **Database**: Firestore (NoSQL, real-time sync)
+- **Authentication**: Firebase Auth (Social Login + Email/Password)
+- **Secret Management**: `.env` driven backend configurations
 
-External API traffic is routed through Firebase Cloud Functions deployed in `asia-south1`:
+### External Integrations
+- **AI Engine**: Groq SDK (Powered by Llama 3 / Mixtral)
+- **Job Engine**: JSearch API (Optimized for India-only job discovery)
+- **News Engine**: GNews API (Personalized tech news feed)
 
-- `fetchGroqChat`
-- `fetchNews`
+---
 
-The client connects to those functions through `firebase/functions`, so no browser-exposed API secrets are required in `.env`.
+## 🌟 Key Features
 
-## Run Locally
+### ⚔️ Code Battle (Clash)
+- Real-time 1v1 coding competitions.
+- Automatic question generation with categories like DSA, System Design, and Frontend.
+- Live opponent activity tracking.
+- Intelligent code execution and test-case evaluation.
+- Dynamic randomization ensuring unique question sets every battle.
 
-```bash
-npm install
-npm run dev
-```
+### 🤖 AI Interviews
+- Voice and text-based interactive interviews.
+- Real-time AI feedback and professional performance reports.
+- Customizable difficulty and stack selection.
 
-## Routing Overview
+### 💼 Career Hub
+- India-only job search engine powered by real-time data.
+- Personalized tech news feed to stay updated with the industry.
 
-Public routes:
+### 📊 Recruiter Dashboard
+- End-to-end assessment management.
+- Candidate invitation system.
+- Detailed result analytics and problem creation suite.
 
-- `/`
-- `/login`
-- `/register`
-- `/news`
-- `/terminal`
-- `/clash`
+---
 
-AI interview routes:
+## 🚀 Getting Started
 
-- `/interview`
-- `/interview/room`
-- `/interview/report`
+### Prerequisites
+- Node.js (v18+)
+- npm or yarn
 
-Assessment routes:
+### Installation
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Setup Firebase:
+   - Ensure your Firebase project is configured in `src/lib/firebase.js`.
+   - Deploy backend functions located in `firebase-backend/proxy functions for api key/functions`.
+4. Run locally:
+   ```bash
+   npm run dev
+   ```
 
-- `/assessment/invite/:token`
-- `/assessment/take/:id`
+---
 
-Dashboard routes:
+## 👤 Credits
 
-- `/dashboard`
-- `/dashboard/assessments`
-- `/dashboard/problems`
-- `/dashboard/candidates`
-- `/dashboard/account`
-- `/dashboard/settings`
-
-## Performance Optimizations Implemented
-
-- Route-level lazy loading in `src/App.jsx`
-- Suspense fallback for route loading states
-- Lazy Firebase auth listener loading on public pages (`src/pages/Home.jsx`, `src/components/PublicNavbar.jsx`)
-- Manual Vite chunk splitting for `firebase`, `react-vendor`, `router`, `motion`, and `icons`
-
-## Project Structure
-
-```text
-skillpilot/
-├── package.json
-├── package-lock.json
-├── README.md
-├── postcss.config.js
-├── tailwind.config.js
-├── vite.config.js
-├── public/
-│   └── vite.svg
-└── src/
-    ├── App.jsx
-    ├── main.jsx
-    ├── index.css
-    ├── components/
-    │   ├── BackgroundGlow.jsx
-    │   ├── CustomCursor.jsx
-    │   ├── DashboardLayout.jsx
-    │   ├── MainLayout.jsx
-    │   ├── Navbar.jsx
-    │   ├── Noise.jsx
-    │   ├── PublicNavbar.jsx
-    │   └── SmoothScroll.jsx
-    ├── lib/
-    │   └── firebase.js
-    ├── services/
-    │   └── geminiService.js
-    └── pages/
-        ├── Clash.jsx
-        ├── Home.jsx
-        ├── Interview.jsx
-        ├── InterviewReport.jsx
-        ├── InterviewRoom.jsx
-        ├── InterviewSetup.jsx
-        ├── InviteVerify.jsx
-        ├── LandingPage.jsx
-        ├── Login.jsx
-        ├── News.jsx
-        ├── Register.jsx
-        ├── TakeAssessment.jsx
-        └── dashboard/
-            ├── Account.jsx
-            ├── AssessmentDetail.jsx
-            ├── AssessmentResults.jsx
-            ├── Assessments.jsx
-            ├── CandidateResult.jsx
-            ├── Candidates.jsx
-            ├── CreateAssessment.jsx
-            ├── CreateProblem.jsx
-            ├── DashboardOverview.jsx
-            ├── EditAssessment.jsx
-            ├── EditProblem.jsx
-            ├── InviteCandidates.jsx
-            ├── ProblemDetail.jsx
-            ├── Problems.jsx
-            └── Settings.jsx
-```
-
-## Deployment Notes
-
-- Run `npm run build` before deployment.
-- Serve the `dist/` folder from your static hosting provider.
-- Ensure the Firebase proxy functions are deployed in `asia-south1`.
+**Made with ❤️ by Pawan**
