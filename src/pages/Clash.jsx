@@ -469,34 +469,6 @@ export default function Clash() {
       const response = await submitClashAnswer({ roomId, questionId: currentQuestion.id, code: myCode, language });
       const res = response?.result || null;
       setRunState({ running: false, submitting: false, error: "", output: res });
-      
-      if (res && res.passed === res.total && res.total > 0) {
-        if (currentQuestionIndex < questions.length - 1) {
-          setTimeout(() => {
-            setCurrentQuestionIndex((prevIdx) => {
-              if (prevIdx >= questions.length - 1) return prevIdx;
-              const nextIdx = prevIdx + 1;
-              const nextQ = questions[nextIdx];
-              setCodeMap((prevMap) => {
-                const savedLocal = prevMap[nextQ.id];
-                setMyCode(() => {
-                  const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
-                  const submittedCode = mySubmissions[nextQ.id]?.code;
-                  const targetCode = savedLocal ?? submittedCode ?? getStarterCode(nextQ, language);
-                  if (roomId && playerRole) {
-                    const roomRef = doc(db, "battles", roomId);
-                    updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
-                  }
-                  return targetCode;
-                });
-                return prevMap;
-              });
-              setRunState({ running: false, submitting: false, error: "", output: null });
-              return nextIdx;
-            });
-          }, 1500);
-        }
-      }
     } catch (error) {
       setRunState({ running: false, submitting: false, error: error.message || "Submit failed", output: null });
     }
@@ -874,30 +846,38 @@ export default function Clash() {
               <div className="w-[380px] min-w-[300px] max-w-[460px] flex flex-col border-r border-white/10 bg-[#1e1e1e]">
                 {/* Question Tabs */}
                 <div className="border-b border-white/10 bg-[#252525] px-3 py-2 flex gap-1 overflow-x-auto shrink-0">
-                  {questions.map((q, idx) => (
-                    <button
-                      key={q.id || idx}
-                      onClick={() => {
-                        setCurrentQuestionIndex(idx);
-                        const q = questions[idx];
-                        const savedLocal = codeMap[q.id];
-                        const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
-                        const submittedCode = mySubmissions[q.id]?.code;
-                        const targetCode = savedLocal ?? submittedCode ?? getStarterCode(q, language);
-                        setMyCode(targetCode);
-                        if (roomId && playerRole) {
-                          const roomRef = doc(db, "battles", roomId);
-                          updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
-                        }
-                      }}
-                      className={`px-3 py-1.5 text-xs rounded whitespace-nowrap transition-colors ${idx === currentQuestionIndex
-                        ? "bg-white/10 text-white font-medium"
-                        : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
-                      }`}
-                    >
-                      Q{idx + 1}
-                    </button>
-                  ))}
+                  {questions.map((q, idx) => {
+                    const mySubMap = roomData?.submissions?.[auth.currentUser?.uid] || {};
+                    const isPassed = mySubMap[q.id]?.passed === mySubMap[q.id]?.total && mySubMap[q.id]?.total > 0;
+                    return (
+                      <button
+                        key={q.id || idx}
+                        onClick={() => {
+                          setCurrentQuestionIndex(idx);
+                          // Clear run state when switching tabs so old output doesn't persist to the new question
+                          setRunState({ running: false, submitting: false, error: "", output: null });
+                          
+                          const targetQuestion = questions[idx];
+                          const savedLocal = codeMap[targetQuestion.id];
+                          const submittedCode = mySubMap[targetQuestion.id]?.code;
+                          const targetCode = savedLocal ?? submittedCode ?? getStarterCode(targetQuestion, language);
+                          setMyCode(targetCode);
+                          
+                          if (roomId && playerRole) {
+                            const roomRef = doc(db, "battles", roomId);
+                            updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
+                          }
+                        }}
+                        className={`px-3 py-1.5 text-xs rounded whitespace-nowrap transition-colors flex items-center gap-1.5 ${idx === currentQuestionIndex
+                          ? "bg-white/10 text-white font-medium"
+                          : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
+                        }`}
+                      >
+                        {isPassed && <span className="text-emerald-400">✓</span>}
+                        Q{idx + 1}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {/* Problem Content */}
