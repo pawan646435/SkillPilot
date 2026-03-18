@@ -200,6 +200,7 @@ export default function Clash() {
   const [copied, setCopied] = useState(false);
   const [myCode, setMyCode] = useState("// Awaiting input...\n");
   const [opponentCode, setOpponentCode] = useState("// Intercepting opponent uplink...\n");
+  const [codeMap, setCodeMap] = useState({});
   const [playerRole, setPlayerRole] = useState(null);
   const [language, setLanguage] = useState("javascript");
   const [stack, setStack] = useState("DSA");
@@ -247,6 +248,8 @@ export default function Clash() {
       setPlayerRole(role);
       setLanguage(joinLanguage);
       setMyCode(initialCode);
+      const firstQid = joinedRoom?.questions?.[0]?.id;
+      if (firstQid) setCodeMap({ [firstQid]: initialCode });
       setView(joinedRoom?.status === "BATTLE" ? "BATTLE" : "WAITING");
       listenToRoom(idToJoin, role);
     } catch (error) {
@@ -387,6 +390,7 @@ export default function Clash() {
       setQuestions(roomQuestions);
       setCurrentQuestionIndex(0);
       setMyCode(initialCode);
+      setCodeMap({ [roomQuestions[0].id]: initialCode });
       setView("WAITING");
       listenToRoom(newRoomId, "player1");
     } catch (error) {
@@ -435,6 +439,9 @@ export default function Clash() {
 
   const handleCodeChange = async (newCode) => {
     setMyCode(newCode);
+    if (currentQuestion?.id) {
+      setCodeMap((prev) => ({ ...prev, [currentQuestion.id]: newCode }));
+    }
     if (roomId && playerRole) {
       if (syncTimerRef.current) clearTimeout(syncTimerRef.current);
       syncTimerRef.current = setTimeout(async () => {
@@ -460,7 +467,29 @@ export default function Clash() {
     setRunState({ running: false, submitting: true, error: "", output: null });
     try {
       const response = await submitClashAnswer({ roomId, questionId: currentQuestion.id, code: myCode, language });
-      setRunState({ running: false, submitting: false, error: "", output: response?.result || null });
+      const res = response?.result || null;
+      setRunState({ running: false, submitting: false, error: "", output: res });
+      
+      if (res && res.passed === res.total && res.total > 0) {
+        if (currentQuestionIndex < questions.length - 1) {
+          setTimeout(() => {
+            const nextIdx = currentQuestionIndex + 1;
+            setCurrentQuestionIndex(nextIdx);
+            const nextQ = questions[nextIdx];
+            const savedLocal = codeMap[nextQ.id];
+            // Since we're in a setTimeout closure, get the latest submissions via db directly or rely on roomData state capture.
+            // A quick re-render might have happened, but roomData from closure is fine since submissions don't change unprompted.
+            const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
+            const submittedCode = mySubmissions[nextQ.id]?.code;
+            const targetCode = savedLocal ?? submittedCode ?? getStarterCode(nextQ, language);
+            setMyCode(targetCode);
+            if (roomId && playerRole) {
+              const roomRef = doc(db, "battles", roomId);
+              updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
+            }
+          }, 1500);
+        }
+      }
     } catch (error) {
       setRunState({ running: false, submitting: false, error: error.message || "Submit failed", output: null });
     }
@@ -818,7 +847,7 @@ export default function Clash() {
                 </div>
 
                 <div className="flex gap-2 shrink-0">
-                  <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs bg-amber-500/15 text-amber-300 px-3 py-1.5 rounded hover:bg-amber-500/25 disabled:opacity-40 font-medium transition-colors border border-amber-500/20 hover:border-amber-500/40">Finalize</button>
+                  <button onClick={finalizeBattle} disabled={timerExpired} className="text-xs bg-amber-500/15 text-amber-300 px-3 py-1.5 rounded hover:bg-amber-500/25 disabled:opacity-40 font-medium transition-colors border border-amber-500/20 hover:border-amber-500/40">Finish Test</button>
                   <button onClick={abortBattle} className="text-xs bg-rose-500/10 text-rose-400 px-3 py-1.5 rounded hover:bg-rose-500/20 font-medium transition-colors border border-rose-500/20 hover:border-rose-500/40">Abort</button>
                 </div>
               </div>
@@ -841,7 +870,19 @@ export default function Clash() {
                   {questions.map((q, idx) => (
                     <button
                       key={q.id || idx}
-                      onClick={() => setCurrentQuestionIndex(idx)}
+                      onClick={() => {
+                        setCurrentQuestionIndex(idx);
+                        const q = questions[idx];
+                        const savedLocal = codeMap[q.id];
+                        const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
+                        const submittedCode = mySubmissions[q.id]?.code;
+                        const targetCode = savedLocal ?? submittedCode ?? getStarterCode(q, language);
+                        setMyCode(targetCode);
+                        if (roomId && playerRole) {
+                          const roomRef = doc(db, "battles", roomId);
+                          updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
+                        }
+                      }}
                       className={`px-3 py-1.5 text-xs rounded whitespace-nowrap transition-colors ${idx === currentQuestionIndex
                         ? "bg-white/10 text-white font-medium"
                         : "text-neutral-500 hover:text-neutral-300 hover:bg-white/5"
@@ -889,7 +930,11 @@ export default function Clash() {
                       onChange={(e) => {
                         const newLang = e.target.value;
                         setLanguage(newLang);
-                        setMyCode(getStarterCode(currentQuestion, newLang));
+                        const starter = getStarterCode(currentQuestion, newLang);
+                        setMyCode(starter);
+                        if (currentQuestion?.id) {
+                          setCodeMap((prev) => ({ ...prev, [currentQuestion.id]: starter }));
+                        }
                         if (roomId && playerRole) {
                           const roomRef = doc(db, "battles", roomId);
                           updateDoc(roomRef, {
@@ -962,6 +1007,16 @@ export default function Clash() {
                         <Send className="w-3 h-3" />
                         {runState.submitting ? "Submitting..." : "Submit"}
                       </button>
+                      {currentQuestionIndex === questions.length - 1 && (
+                        <button
+                          onClick={finalizeBattle}
+                          disabled={timerExpired}
+                          className="flex items-center gap-1.5 px-4 py-1.5 bg-amber-500 text-white text-xs font-medium rounded hover:bg-amber-400 disabled:opacity-40 transition-colors"
+                        >
+                          <Trophy className="w-3 h-3" />
+                          Finish Test
+                        </button>
+                      )}
                     </div>
                   </div>
 
