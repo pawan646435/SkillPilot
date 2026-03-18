@@ -48,10 +48,20 @@ export async function fetchClashQuestions({ stack, difficulty, count }) {
 
   constraints.push(orderBy("createdAt", "desc"));
 
-  constraints.push(limit(Math.max(1, Math.min(Number(count) || 1, 10))));
+  // Fetch up to 50 recent matching questions so we can shuffle and select randomly
+  constraints.push(limit(50));
 
   const q = query(collection(db, "clashQuestions"), ...constraints);
   const snap = await getDocs(q);
 
-  return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+  const allDocs = snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
+
+  // Fisher-Yates shuffle to randomize questions
+  for (let i = allDocs.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [allDocs[i], allDocs[j]] = [allDocs[j], allDocs[i]];
+  }
+
+  const requestedCount = Math.max(1, Math.min(Number(count) || 1, 10));
+  return allDocs.slice(0, requestedCount);
 }

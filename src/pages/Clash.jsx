@@ -410,7 +410,7 @@ export default function Clash() {
       const data = docSnap.data();
       setRoomData(data);
       setQuestions(data?.questions || []);
-      setCurrentQuestionIndex(Number(data?.currentQuestionIndex || 0));
+      // Intentionally avoiding setCurrentQuestionIndex here so users aren't thrown back to Q1 when typing updates the DB.
 
       if (data.status === "BATTLE") setView("BATTLE");
 
@@ -469,6 +469,34 @@ export default function Clash() {
       const response = await submitClashAnswer({ roomId, questionId: currentQuestion.id, code: myCode, language });
       const res = response?.result || null;
       setRunState({ running: false, submitting: false, error: "", output: res });
+      
+      if (res && res.passed === res.total && res.total > 0) {
+        if (currentQuestionIndex < questions.length - 1) {
+          setTimeout(() => {
+            setCurrentQuestionIndex((prevIdx) => {
+              if (prevIdx >= questions.length - 1) return prevIdx;
+              const nextIdx = prevIdx + 1;
+              const nextQ = questions[nextIdx];
+              setCodeMap((prevMap) => {
+                const savedLocal = prevMap[nextQ.id];
+                setMyCode(() => {
+                  const mySubmissions = roomData?.submissions?.[auth.currentUser?.uid] || {};
+                  const submittedCode = mySubmissions[nextQ.id]?.code;
+                  const targetCode = savedLocal ?? submittedCode ?? getStarterCode(nextQ, language);
+                  if (roomId && playerRole) {
+                    const roomRef = doc(db, "battles", roomId);
+                    updateDoc(roomRef, { [`${playerRole}.code`]: targetCode, updatedAt: serverTimestamp() }).catch(()=>{});
+                  }
+                  return targetCode;
+                });
+                return prevMap;
+              });
+              setRunState({ running: false, submitting: false, error: "", output: null });
+              return nextIdx;
+            });
+          }, 1500);
+        }
+      }
     } catch (error) {
       setRunState({ running: false, submitting: false, error: error.message || "Submit failed", output: null });
     }
