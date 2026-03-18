@@ -780,7 +780,33 @@ export default function Clash() {
 
                     {/* CTA Buttons */}
                     <div className="flex gap-3 justify-center">
-                      <button onClick={() => { window.location.href = "/clash"; }} className="px-6 py-3 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest text-sm">
+                      <button 
+                        onClick={() => {
+                          if (roomUnsubscribeRef.current) {
+                            roomUnsubscribeRef.current();
+                            roomUnsubscribeRef.current = null;
+                          }
+                          if (syncTimerRef.current) {
+                            clearTimeout(syncTimerRef.current);
+                            syncTimerRef.current = null;
+                          }
+                          setView("LOBBY");
+                          setRoomId("");
+                          setRoomData(null);
+                          setQuestions([]);
+                          setCurrentQuestionIndex(0);
+                          setPlayerRole(null);
+                          setMyCode("// Awaiting input...\n");
+                          setOpponentCode("// Intercepting opponent uplink...\n");
+                          setCodeMap({});
+                          setRunState({ running: false, submitting: false, error: "", output: null });
+                          setFinalizedResult(null);
+                          setTimerExpired(false);
+                          setTimeRemaining(null);
+                          navigate("/clash", { replace: true });
+                        }} 
+                        className="px-6 py-3 border border-[#00ff41] bg-[#00ff41]/10 hover:bg-[#00ff41] hover:text-black transition-all font-bold tracking-widest text-sm"
+                      >
                         Play Again
                       </button>
                       <button onClick={() => navigate("/dashboard")} className="px-6 py-3 border border-[#00ff41]/30 hover:bg-[#00ff41]/10 transition-all font-bold tracking-widest text-sm">
