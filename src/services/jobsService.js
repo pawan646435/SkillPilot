@@ -1,4 +1,3 @@
-import { getFunctions, httpsCallable } from "firebase/functions";
 import {
   collection,
   deleteDoc,
@@ -8,7 +7,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { app, db } from "../lib/firebase";
+import { db } from "../lib/firebase";
 
 export const JOB_CATEGORIES = [
   { id: "software-dev", label: "Software Dev", role: "Software Engineer" },
@@ -18,29 +17,68 @@ export const JOB_CATEGORIES = [
   { id: "design", label: "Design", role: "Product Designer" },
 ];
 
-const functions = getFunctions(app, "asia-south1");
-const fetchJobsProxy = httpsCallable(functions, "fetchJobs");
+// ── Client-side cache (localStorage) ──
+const CLIENT_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
 
-function toJobId(value) {
-  return String(value || "").trim();
+function getClientCache(category) {
+  try {
+    const raw = localStorage.getItem(`sp_jobs_${category}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (Date.now() - parsed.timestamp > CLIENT_CACHE_TTL_MS) {
+      localStorage.removeItem(`sp_jobs_${category}`);
+      return null;
+    }
+    return parsed.data;
+  } catch {
+    return null;
+  }
 }
 
+function setClientCache(category, data) {
+  try {
+    localStorage.setItem(
+      `sp_jobs_${category}`,
+      JSON.stringify({ data, timestamp: Date.now() })
+    );
+  } catch {
+    // localStorage full or unavailable — silently ignore
+  }
+}
+
+// ── Fetch jobs from Vercel API route ──
 export async function getJobsFromProxy(category) {
   const selectedCategory =
     typeof category === "object"
       ? category
       : JOB_CATEGORIES.find((item) => item.id === category) || JOB_CATEGORIES[0];
 
-  try {
-    const { data } = await fetchJobsProxy({
-      category: selectedCategory.id,
-      role: selectedCategory.role,
-      region: "india",
-    });
+  // Check client-side cache first
+  const cached = getClientCache(selectedCategory.id);
+  if (cached && Array.isArray(cached.jobs) && cached.jobs.length > 0) {
+    return { ...cached, source: "client-cache" };
+  }
 
-    return data || {};
+  try {
+    const url = `/api/jobs?category=${encodeURIComponent(selectedCategory.id)}`;
+    const response = await fetch(url);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      console.error("Job API error:", response.status, errorData);
+      throw new Error(errorData.error || `HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+
+    // Cache successful responses with actual jobs
+    if (Array.isArray(data.jobs) && data.jobs.length > 0) {
+      setClientCache(selectedCategory.id, data);
+    }
+
+    return data;
   } catch (error) {
-    console.error("fetchJobs callable failed:", error);
+    console.error("fetchJobs failed:", error);
     return {
       category: selectedCategory.id,
       region: "india",
@@ -58,6 +96,10 @@ export async function listSavedJobs(uid) {
     id: docSnap.id,
     ...docSnap.data(),
   }));
+}
+
+function toJobId(value) {
+  return String(value || "").trim();
 }
 
 export async function saveJob(uid, job) {

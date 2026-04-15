@@ -391,8 +391,8 @@ export default function Jobs() {
               </h1>
               <p className="max-w-2xl text-base leading-8 text-neutral-300 md:text-lg">
                 Browse curated openings across engineering, DevOps, data,
-                product, and design. Jobs are served through Firebase-backed cache
-                refreshes for fast responses and smoother browsing.
+                product, and design. Jobs are aggregated from LinkedIn, Indeed,
+                Glassdoor and more via JSearch.
               </p>
             </div>
 
@@ -443,14 +443,16 @@ export default function Jobs() {
             </p>
             <p className="text-sm text-neutral-400">
               {dataSource === "cache"
-                ? "Jobs were served from Firestore cache."
-                : dataSource === "upstream"
-                  ? "Jobs were freshly synced from JSearch."
-                  : dataSource === "stale-cache"
-                    ? "Upstream providers were unavailable, so stale cached jobs are being shown."
-                    : dataSource === "provider-unavailable"
-                      ? "The upstream job providers are unavailable right now, so no fresh jobs could be loaded."
-                  : "Choose a category to load current listings."}
+                ? "Jobs were served from server cache."
+                : dataSource === "client-cache"
+                  ? "Jobs were served from your local cache."
+                  : dataSource === "upstream"
+                    ? "Jobs were freshly synced from JSearch."
+                    : dataSource === "stale-cache"
+                      ? "Upstream providers were unavailable, so stale cached jobs are being shown."
+                      : dataSource === "provider-unavailable"
+                        ? "The upstream job providers are unavailable right now. Check back in a few minutes."
+                        : "Choose a category to load current listings."}
             </p>
           </div>
 
