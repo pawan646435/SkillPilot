@@ -115,7 +115,7 @@ export default function Account() {
       showToast("Password changed successfully");
       setPwStep("idle");
       setCurrentPassword(""); setNewPassword(""); setConfirmPassword("");
-    } catch (err) {
+    } catch (_err) {
       showToast("Incorrect current password or error updating.", "error");
     } finally {
       setPwChanging(false);

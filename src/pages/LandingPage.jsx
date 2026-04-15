@@ -75,7 +75,7 @@ function sampleSpline(pts, t) {
 /* ── Sound synthesis (single AudioContext, reused) ── */
 let _exitAudioCtx = null;
 function getExitAudioCtx() {
-  if (!_exitAudioCtx) { try { _exitAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_) {} }
+  if (!_exitAudioCtx) { try { _exitAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch (_e) { /* audio context not supported */ } }
   return _exitAudioCtx;
 }
 

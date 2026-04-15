@@ -2,12 +2,11 @@
 import { motion } from "framer-motion";
 import { ArrowLeft, Send, Search, Mail, Loader2, CheckCircle2, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useParams, Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { doc, getDoc, collection, getDocs, addDoc, query, where, serverTimestamp } from "firebase/firestore";
 
 export default function InviteCandidates() {
-  const navigate = useNavigate();
   const { id } = useParams();
   
   const [assessment, setAssessment] = useState(null);

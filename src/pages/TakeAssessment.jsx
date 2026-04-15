@@ -11,7 +11,7 @@ export default function TakeAssessment() {
   const navigate = useNavigate();
   const { id: assessmentId } = useParams();
   const[searchParams] = useSearchParams();
-  const inviteToken = searchParams.get("invite"); // We can use this later to mark invite as completed
+  const _inviteToken = searchParams.get("invite"); // We can use this later to mark invite as completed
 
   const [assessment, setAssessment] = useState(null);
   const [problems, setProblems] = useState([]);

@@ -6,14 +6,12 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { doc, getDoc, updateDoc, collection, getDocs } from "firebase/firestore";
 
-const difficultyColors = { EASY: "text-emerald-400", MEDIUM: "text-amber-400", HARD: "text-rose-400" };
-
 export default function EditAssessment() {
   const navigate = useNavigate();
   const { id } = useParams();
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+  const [_error, setError] = useState("");
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");

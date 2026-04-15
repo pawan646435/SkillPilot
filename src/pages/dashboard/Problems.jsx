@@ -2,7 +2,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Code2, Search, Filter, Trash2, Edit, Eye, ChevronDown, Tag, Clock, HardDrive, CheckCircle2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
 
@@ -13,7 +13,6 @@ const difficultyColors = {
 };
 
 export default function Problems() {
-  const navigate = useNavigate();
   const[problems, setProblems] = useState([]);
   const [loading, setLoading] = useState(true);
   const[search, setSearch] = useState("");
@@ -50,7 +49,7 @@ export default function Problems() {
     try {
       await deleteDoc(doc(db, "problems", id));
       setProblems((prev) => prev.filter((p) => p.id !== id));
-    } catch (err) {
+    } catch (_err) {
       alert("Failed to delete problem");
     } finally {
       setDeleting(null);
