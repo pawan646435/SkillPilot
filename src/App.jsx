@@ -78,6 +78,7 @@ function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/news" element={<News />} />
               <Route path="/jobs" element={<Jobs />} />
+              <Route path="/interview" element={<InterviewSetup />} />
             </Route>
 
             {/* THE HACKER TERMINAL THEME */}
@@ -88,8 +89,7 @@ function App() {
             <Route path="/assessment/take/:id" element={<TakeAssessment />} />
             <Route path="/clash" element={<Clash />} />
 
-            {/* AI INTERVIEW - Full screen, Lenis disabled */}
-            <Route path="/interview" element={<InterviewSetup />} />
+            {/* AI INTERVIEW - Full screen for room & report */}
             <Route path="/interview/room" element={<InterviewRoom />} />
             <Route path="/interview/report" element={<InterviewReport />} />
 
