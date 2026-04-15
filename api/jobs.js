@@ -1,3 +1,4 @@
+/* global process */
 // api/jobs.js — Vercel Serverless Function: JSearch proxy with in-memory cache
 // Deployed at /api/jobs?category=software-dev
 
