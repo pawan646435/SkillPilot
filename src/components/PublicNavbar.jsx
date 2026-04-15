@@ -41,8 +41,8 @@ export default function PublicNavbar() {
     <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-[#0a0a0a]/70 backdrop-blur-xl">
       <div className="flex items-center justify-between h-16 px-6 mx-auto max-w-7xl">
         
-        {/* LOGO - Now clicks to Dashboard if logged in! */}
-        <Link to={user ? "/dashboard" : "/"} className="flex items-center gap-3 group">
+        {/* LOGO - Always goes to home page */}
+        <Link to="/" className="flex items-center gap-3 group">
           <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-neutral-800 to-black border border-white/10 flex items-center justify-center group-hover:border-white/30 transition-all shadow-[0_0_15px_rgba(255,255,255,0.05)]">
             <Terminal className="w-4 h-4 text-white/90" />
           </div>
