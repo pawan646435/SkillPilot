@@ -1,5 +1,10 @@
-const FETCH_NEWS_URL = "https://fetchnews-whrhzzz3ca-el.a.run.app";
-const FETCH_GROQ_CHAT_URL = "https://fetchgroqchat-whrhzzz3ca-el.a.run.app";
+const isDev = import.meta.env.DEV;
+const FETCH_NEWS_URL = isDev
+  ? "http://localhost:5001/myproject-a48d7/asia-south1/fetchNews"
+  : "https://fetchnews-whrhzzz3ca-el.a.run.app";
+const FETCH_GROQ_CHAT_URL = isDev
+  ? "http://localhost:5001/myproject-a48d7/asia-south1/fetchGroqChat"
+  : "https://fetchgroqchat-whrhzzz3ca-el.a.run.app";
 
 function getErrorMessage(error, fallback) {
   return error?.message || error?.details?.message || fallback;

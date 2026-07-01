@@ -1,8 +1,12 @@
-import { httpsCallable, getFunctions } from "firebase/functions";
+import { httpsCallable, getFunctions, connectFunctionsEmulator } from "firebase/functions";
 import { app, db } from "../lib/firebase";
 import { collection, getDocs, limit, query, where, orderBy } from "firebase/firestore";
 
 const functions = getFunctions(app, "asia-south1");
+
+if (import.meta.env.DEV) {
+  connectFunctionsEmulator(functions, "localhost", 5001);
+}
 
 const runClashCodeFn = httpsCallable(functions, "runClashCode");
 const submitClashAnswerFn = httpsCallable(functions, "submitClashAnswer");

@@ -426,11 +426,9 @@ export default function Clash() {
       }
 
       if (role === "player1" && data.player2) {
-        setOpponentCode(data.player2.code);
-        setMyCode((prev) => data.player1?.code || prev);
+        setOpponentCode(data.player2.code || "");
       } else if (role === "player2" && data.player1) {
-        setOpponentCode(data.player1.code);
-        setMyCode((prev) => data.player2?.code || prev);
+        setOpponentCode(data.player1.code || "");
       }
 
       setLanguage(data?.config?.language || "javascript");
