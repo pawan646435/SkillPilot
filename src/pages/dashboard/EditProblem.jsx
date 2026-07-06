@@ -151,12 +151,15 @@ export default function EditProblem() {
         </div>
 
         <div className="p-6 border shadow-xl rounded-2xl bg-surface border-white/5">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center justify-between mb-3">
             <label className="text-sm font-semibold text-neutral-300">Test Cases</label>
             <button type="button" onClick={addTestCase} className="flex items-center gap-2 px-4 py-2 text-xs font-bold tracking-wider bg-white/[0.05] border border-white/10 rounded-lg text-white hover:bg-white/10 transition-all uppercase">
               <Plus className="w-3.5 h-3.5" /> Add Case
             </button>
           </div>
+          <p className="mb-6 text-xs text-neutral-500">
+            Input must be a JSON array of function arguments (e.g. <code className="text-emerald-400">[[2,7,11,15], 9]</code>), and Expected Output the JSON-encoded return value. The candidate's code is judged by calling a <code className="text-emerald-400">solution(...)</code> function with these arguments.
+          </p>
 
           <div className="flex flex-col gap-5">
             <AnimatePresence>
@@ -178,12 +181,12 @@ export default function EditProblem() {
                   </div>
                   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                     <div>
-                      <label className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest mb-2 block">Input</label>
-                      <textarea value={tc.input} onChange={(e) => updateTestCase(idx, "input", e.target.value)} rows={3} className="w-full px-4 py-3 bg-white/[0.02] border border-white/5 rounded-xl text-emerald-300 text-sm font-mono focus:border-emerald-500/30 focus:outline-none transition-all resize-none" />
+                      <label className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest mb-2 block">Input (JSON array of args)</label>
+                      <textarea value={tc.input} onChange={(e) => updateTestCase(idx, "input", e.target.value)} placeholder="e.g. [[2,7,11,15], 9]" rows={3} className="w-full px-4 py-3 bg-white/[0.02] border border-white/5 rounded-xl text-emerald-300 text-sm font-mono placeholder:text-neutral-700 focus:border-emerald-500/30 focus:outline-none transition-all resize-none" />
                     </div>
                     <div>
-                      <label className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest mb-2 block">Expected Output</label>
-                      <textarea value={tc.expected} onChange={(e) => updateTestCase(idx, "expected", e.target.value)} rows={3} className="w-full px-4 py-3 bg-white/[0.02] border border-white/5 rounded-xl text-emerald-300 text-sm font-mono focus:border-emerald-500/30 focus:outline-none transition-all resize-none" />
+                      <label className="text-[10px] text-neutral-600 font-bold uppercase tracking-widest mb-2 block">Expected Output (JSON)</label>
+                      <textarea value={tc.expected} onChange={(e) => updateTestCase(idx, "expected", e.target.value)} placeholder="e.g. [0,1]" rows={3} className="w-full px-4 py-3 bg-white/[0.02] border border-white/5 rounded-xl text-emerald-300 text-sm font-mono placeholder:text-neutral-700 focus:border-emerald-500/30 focus:outline-none transition-all resize-none" />
                     </div>
                   </div>
                 </motion.div>

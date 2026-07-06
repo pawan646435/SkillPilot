@@ -6,34 +6,38 @@ import {
   Settings, LogOut, Code2, UserCircle, BrainCircuit, Newspaper, Swords
 } from "lucide-react";
 import { auth, db } from "../lib/firebase";
-import { onAuthStateChanged, signOut } from "firebase/auth";
+import { signOut } from "firebase/auth";
 import { doc, getDoc } from "firebase/firestore";
+import { useAuth } from "../context/authContextStore";
 import Noise from "./Noise";
 import BackgroundGlow from "./BackgroundGlow";
 
 export default function DashboardLayout() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
-  const [authReady, setAuthReady] = useState(false);
+  const { user: authUser, authReady } = useAuth();
+  const [profile, setProfile] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      if (currentUser) {
-        const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-        if (userDoc.exists()) {
-          setUser({ ...currentUser, ...userDoc.data() });
-        } else {
-          setUser(currentUser);
-        }
-      } else {
-        setUser(null);
-        navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`);
-      }
-      setAuthReady(true);
+    if (!authReady) return;
+
+    if (!authUser) {
+      navigate(`/login?redirect=${encodeURIComponent(location.pathname)}`);
+      return;
+    }
+
+    let isMounted = true;
+    getDoc(doc(db, "users", authUser.uid)).then((userDoc) => {
+      if (!isMounted) return;
+      setProfile(userDoc.exists() ? userDoc.data() : null);
     });
-    return () => unsubscribe();
-  }, [navigate, location.pathname]);
+
+    return () => {
+      isMounted = false;
+    };
+  }, [authUser, authReady, navigate, location.pathname]);
+
+  const user = authUser ? { ...authUser, ...profile } : null;
 
   const getAvatarUrl = () => {
     if (!user?.photoURL) return null;

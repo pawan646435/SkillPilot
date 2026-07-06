@@ -7,7 +7,9 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
-import { db } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export const JOB_CATEGORIES = [
   { id: "software-dev", label: "Software Dev", role: "Software Engineer" },
@@ -46,7 +48,7 @@ function setClientCache(category, data) {
   }
 }
 
-// ── Fetch jobs from Vercel API route ──
+// ── Fetch jobs from the FastAPI backend ──
 export async function getJobsFromProxy(category) {
   const selectedCategory =
     typeof category === "object"
@@ -60,13 +62,16 @@ export async function getJobsFromProxy(category) {
   }
 
   try {
-    const url = `/api/jobs?category=${encodeURIComponent(selectedCategory.id)}`;
-    const response = await fetch(url);
+    const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+    const url = `${API_BASE_URL}/jobs?category=${encodeURIComponent(selectedCategory.id)}`;
+    const response = await fetch(url, {
+      headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+    });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({}));
       console.error("Job API error:", response.status, errorData);
-      throw new Error(errorData.error || `HTTP ${response.status}`);
+      throw new Error(errorData.detail || errorData.error || `HTTP ${response.status}`);
     }
 
     const data = await response.json();

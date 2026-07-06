@@ -4,8 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import gsap from "gsap";
-import { onAuthStateChanged } from "firebase/auth";
-import { auth } from "../lib/firebase";
+import { useAuth } from "../context/authContextStore";
 
 /* ── tiny helpers ── */
 function TypeWriter({ text, speed = 40, delay = 0, className = "" }) {
@@ -131,18 +130,12 @@ function playExitBoom() {
 export default function LandingPage() {
   const[bootDone, setBoot] = useState(false);
   const [exiting, setExiting] = useState(false);
-  const [currentUser, setCurrentUser] = useState(null);
+  const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const exitBtnRef = useRef(null);
   const[exitOrigin, setExitOrigin] = useState({ x: 0, y: 0 });
 
   useEffect(() => { const t = setTimeout(() => setBoot(true), 1800); return () => clearTimeout(t); }, []);
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user || null);
-    });
-    return () => unsub();
-  }, []);
 
   const [exitCountNum, setExitCountNum] = useState(null);
 

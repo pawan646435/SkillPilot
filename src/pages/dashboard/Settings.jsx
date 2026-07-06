@@ -43,9 +43,9 @@ export default function Settings() {
           <Sparkles className="w-4 h-4 text-emerald-400" /> AI Interviewer Engine
         </h2>
         <p className="mb-6 text-sm leading-relaxed text-neutral-300">
-          The AI interviewer uses Google Gemini to conduct technical interviews. Currently, it runs on the platform's global API key. No configuration is required.
+          The AI interviewer uses Groq (Llama 3.3 70B) to conduct technical interviews. Currently, it runs on the platform's global API key. No configuration is required.
         </p>
-        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 transition-all">
+        <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 px-5 py-2.5 bg-white/[0.03] border border-white/10 rounded-xl text-xs font-bold uppercase tracking-wider text-white hover:bg-white/10 transition-all">
           Manage API Keys <ExternalLink className="w-3.5 h-3.5" />
         </a>
       </motion.div>

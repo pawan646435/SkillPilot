@@ -6,8 +6,9 @@ import {
   Mic, MicOff, Send, Loader2, ChevronRight,
   BrainCircuit, Lightbulb, X
 } from "lucide-react";
-import { generateInterviewQuestion, evaluateAnswer, generateFinalReport } from "../services/geminiService";
+import { generateInterviewQuestion, evaluateAnswer, generateFinalReport } from "../services/groqService";
 import { auth, db } from "../lib/firebase";
+import { useAuth } from "../context/authContextStore";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import Noise from "../components/Noise";
 
@@ -41,10 +42,18 @@ export default function InterviewRoom() {
   const [showHint, setShowHint] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [error, setError] = useState(null);
+  const { user: authUser, authReady } = useAuth();
 
   const recognitionRef = useRef(null);
   const textareaRef = useRef(null);
   const hasLoadedInitialQuestionRef = useRef(false);
+
+  // AI Interview is a logged-in feature (the Groq proxy Cloud Function requires auth).
+  useEffect(() => {
+    if (authReady && !authUser) {
+      navigate("/login?redirect=%2Finterview");
+    }
+  }, [authReady, authUser, navigate]);
 
   const loadNextQuestion = async (previousQA) => {
     setPhase(PHASE.LOADING_QUESTION);
@@ -64,13 +73,14 @@ export default function InterviewRoom() {
     }
   };
 
-  // Load first question on mount
+  // Load first question once we know the visitor is signed in
   useEffect(() => {
+    if (!authReady || !authUser) return;
     if (hasLoadedInitialQuestionRef.current) return;
     hasLoadedInitialQuestionRef.current = true;
     loadNextQuestion([]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [authReady, authUser]);
 
   // Auto-focus textarea when answering phase starts
   useEffect(() => {
@@ -209,6 +219,14 @@ export default function InterviewRoom() {
     if (score >= 5) return "bg-amber-400/10 border-amber-400/20";
     return "bg-rose-400/10 border-rose-400/20";
   };
+
+  if (!authReady || !authUser) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-neutral-400 font-mono text-sm">
+        {authReady ? "Redirecting to login..." : "Checking session..."}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed] relative flex flex-col">

@@ -1,42 +1,51 @@
-import { httpsCallable, getFunctions, connectFunctionsEmulator } from "firebase/functions";
-import { app, db } from "../lib/firebase";
+import { auth, db } from "../lib/firebase";
 import { collection, getDocs, limit, query, where, orderBy } from "firebase/firestore";
 
-const functions = getFunctions(app, "asia-south1");
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-if (import.meta.env.DEV) {
-  connectFunctionsEmulator(functions, "localhost", 5001);
+async function authHeaders() {
+  const idToken = await auth.currentUser?.getIdToken().catch(() => null);
+  return {
+    "Content-Type": "application/json",
+    ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+  };
 }
 
-const runClashCodeFn = httpsCallable(functions, "runClashCode");
-const submitClashAnswerFn = httpsCallable(functions, "submitClashAnswer");
-const finalizeClashMatchFn = httpsCallable(functions, "finalizeClashMatch");
-const generateClashQuestionsFn = httpsCallable(functions, "generateClashQuestions");
-const joinClashRoomFn = httpsCallable(functions, "joinClashRoom");
+async function postJson(path, payload) {
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify(payload),
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(data?.detail || data?.message || `Request failed (HTTP ${response.status})`);
+  }
+
+  return data;
+}
 
 export async function runClashCode(payload) {
-  const { data } = await runClashCodeFn(payload);
-  return data;
+  return postJson("/clash/run", payload);
 }
 
 export async function submitClashAnswer(payload) {
-  const { data } = await submitClashAnswerFn(payload);
-  return data;
+  return postJson("/clash/submit", payload);
 }
 
 export async function finalizeClashMatch(payload) {
-  const { data } = await finalizeClashMatchFn(payload);
-  return data;
+  return postJson("/clash/finalize", payload);
 }
 
 export async function generateClashQuestions(payload) {
-  const { data } = await generateClashQuestionsFn(payload);
+  const data = await postJson("/clash/generate-questions", payload);
   return data?.questions || [];
 }
 
 export async function joinClashRoom(payload) {
-  const { data } = await joinClashRoomFn(payload);
-  return data;
+  return postJson("/clash/join", payload);
 }
 
 export async function fetchClashQuestions({ stack, difficulty, count }) {

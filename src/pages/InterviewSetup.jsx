@@ -1,8 +1,9 @@
 // src/pages/InterviewSetup.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion as Motion } from "framer-motion";
 import { BrainCircuit, ChevronRight, Zap, Target, Layers, AlignLeft, ListChecks } from "lucide-react";
+import { useAuth } from "../context/authContextStore";
 import Noise from "../components/Noise";
 import BackgroundGlow from "../components/BackgroundGlow";
 
@@ -72,16 +73,32 @@ const QUESTION_TYPES = [
 
 export default function InterviewSetup() {
   const navigate = useNavigate();
+  const { user, authReady } = useAuth();
   const [role, setRole] = useState("Frontend Engineer");
   const [difficulty, setDifficulty] = useState("Medium");
   const [questionCount, setQuestionCount] = useState(5);
   const [questionType, setQuestionType] = useState("subjective");
+
+  // AI Interview is a logged-in feature (the Groq proxy Cloud Function requires auth).
+  useEffect(() => {
+    if (authReady && !user) {
+      navigate("/login?redirect=%2Finterview");
+    }
+  }, [authReady, user, navigate]);
 
   const handleStart = () => {
     navigate("/interview/room", {
       state: { role, difficulty, questionCount, questionType },
     });
   };
+
+  if (!authReady || !user) {
+    return (
+      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center text-neutral-400 font-mono text-sm">
+        {authReady ? "Redirecting to login..." : "Checking session..."}
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed] relative overflow-hidden flex items-center justify-center">

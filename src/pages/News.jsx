@@ -2,9 +2,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion as Motion, AnimatePresence } from "framer-motion";
 import { Newspaper, Search, ExternalLink, RefreshCw, Clock, X, Bookmark, BookmarkCheck, Sparkles } from "lucide-react";
-import { auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
-import { getNewsFromProxy } from "../services/geminiService";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "../context/authContextStore";
+import { getNewsFromProxy } from "../services/groqService";
 
 const CATEGORIES = [
   { id: "technology", label: "All Tech" },
@@ -138,7 +138,8 @@ function NewsCard({ article, index, isSaved, onToggleSave }) {
 }
 
 export default function News() {
-  const [user, setUser] = useState(null);
+  const navigate = useNavigate();
+  const { user, authReady } = useAuth();
   const [articles, setArticles] = useState([]);
   const [savedArticles, setSavedArticles] = useState({});
   const [viewMode, setViewMode] = useState("feed");
@@ -154,12 +155,12 @@ export default function News() {
 
   const storagePrefix = user?.uid ? `skillpilot-news-${user.uid}` : "skillpilot-news-anon";
 
+  // News is a logged-in feature (the proxy Cloud Function requires auth) — send anonymous visitors to log in.
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser || null);
-    });
-    return () => unsubscribe();
-  }, []);
+    if (authReady && !user) {
+      navigate("/login?redirect=%2Fnews");
+    }
+  }, [authReady, user, navigate]);
 
   useEffect(() => {
     const saved = localStorage.getItem(`${storagePrefix}-bookmarks`);
@@ -213,12 +214,13 @@ export default function News() {
     }
   }, []);
 
-  // Initial load + category/search changes
+  // Initial load + category/search changes (only once we know the visitor is signed in)
   useEffect(() => {
+    if (!authReady || !user) return;
     setPage(1);
     setArticles([]);
     fetchNews(activeCategory, searchQuery, 1, false);
-  }, [activeCategory, searchQuery, fetchNews]);
+  }, [authReady, user, activeCategory, searchQuery, fetchNews]);
 
   const handleLoadMore = async () => {
     const nextPage = page + 1;
@@ -302,6 +304,14 @@ export default function News() {
     localStorage.setItem(localKey, JSON.stringify(brief));
     return brief;
   }, [rankedArticles, storagePrefix]);
+
+  if (!authReady || !user) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh] text-neutral-400 font-mono text-sm">
+        {authReady ? "Redirecting to login..." : "Checking session..."}
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col w-full gap-8 p-6 mx-auto my-8 max-w-7xl md:p-12">

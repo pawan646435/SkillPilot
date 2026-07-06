@@ -14,8 +14,7 @@ import {
   RefreshCw,
   TriangleAlert,
 } from "lucide-react";
-import { auth } from "../lib/firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { useAuth } from "../context/authContextStore";
 import {
   JOB_CATEGORIES,
   getJobsFromProxy,
@@ -214,7 +213,7 @@ function JobCard({ job, index, isSaved, saving, onToggleSave }) {
 
 export default function Jobs() {
   const navigate = useNavigate();
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [jobs, setJobs] = useState([]);
   const [savedJobIds, setSavedJobIds] = useState({});
   const [loading, setLoading] = useState(true);
@@ -223,14 +222,6 @@ export default function Jobs() {
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
   const [dataSource, setDataSource] = useState(null);
   const [activeCategory, setActiveCategory] = useState(JOB_CATEGORIES[0]);
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser || null);
-    });
-
-    return () => unsubscribe();
-  }, []);
 
   useEffect(() => {
     let active = true;

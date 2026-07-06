@@ -4,8 +4,9 @@ import { Terminal, Play, Clock, Code2, AlertCircle, CheckCircle2, Loader2, Chevr
 import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
-import { db, auth } from "../lib/firebase";
-import { doc, getDoc, collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { db } from "../lib/firebase";
+import { doc, getDoc } from "firebase/firestore";
+import { submitAssessmentAnswer } from "../services/assessmentService";
 
 export default function TakeAssessment() {
   const navigate = useNavigate();
@@ -114,47 +115,61 @@ export default function TakeAssessment() {
     }));
   };
 
-  // Mock Code Execution
-  const handleRunCode = () => {
+  // Real Code Execution (test only, not persisted) via the sandboxed judge
+  const handleRunCode = async () => {
+    if (!currentProblemId) return;
     setIsRunning(true);
     setOutput((prev) => [...prev, "> Compiling and executing..."]);
-    
-    setTimeout(() => {
-      setOutput((prev) =>[
-        ...prev, 
-        "> Execution successful.",
-        "> Test Cases Passed: All visible tests pass.",
-        `> Time: ${Math.floor(Math.random() * 40 + 10)}ms | Space: ${Math.floor(Math.random() * 10 + 30)}MB`,
-        "> Ready."
+
+    try {
+      const result = await submitAssessmentAnswer({
+        assessmentId,
+        problemId: currentProblemId,
+        code: currentCode,
+        language: currentLang,
+        mode: "run",
+      });
+
+      const visiblePassed = result.cases.filter((c) => !c.hidden && c.passed).length;
+      const visibleTotal = result.cases.filter((c) => !c.hidden).length;
+
+      setOutput((prev) => [
+        ...prev,
+        result.status === "ACCEPTED" ? "> Execution successful." : `> Execution finished with status: ${result.status}`,
+        `> Visible Test Cases Passed: ${visiblePassed}/${visibleTotal}`,
+        `> Total Test Cases Passed: ${result.passed}/${result.total}`,
+        `> Time: ${result.executionTime}ms`,
+        "> Ready.",
       ]);
+    } catch (err) {
+      setOutput((prev) => [...prev, "> Execution Error: " + err.message]);
+    } finally {
       setIsRunning(false);
-    }, 1500);
+    }
   };
 
-  // Save Submission to Firebase
+  // Judge and persist the submission via the sandboxed Cloud Function
   const handleSubmit = async () => {
     if (!currentProblemId || submitted[currentProblemId]) return;
     setSubmitting(true);
 
     try {
-      const user = auth.currentUser;
-      
-      // Save their code to the 'submissions' collection
-      await addDoc(collection(db, "submissions"), {
+      const result = await submitAssessmentAnswer({
         assessmentId,
         problemId: currentProblemId,
-        candidateId: user ? user.uid : "anonymous",
-        candidateName: user ? user.displayName || "Unknown" : "Anonymous Candidate",
         code: currentCode,
         language: currentLang,
-        status: "ACCEPTED", // Mocking automatic acceptance for now
-        score: currentProblem.marks || 10,
-        executionTime: Math.floor(Math.random() * 40 + 10),
-        createdAt: serverTimestamp()
+        mode: "submit",
       });
 
       setSubmitted((prev) => ({ ...prev, [currentProblemId]: true }));
-      setOutput((prev) => [...prev, "> Solution Submitted Successfully!", "> Encrypted and saved to secure server."]);
+      setOutput((prev) => [
+        ...prev,
+        `> Solution Submitted: ${result.status}`,
+        `> Test Cases Passed: ${result.passed}/${result.total}`,
+        `> Score Awarded: ${result.score}`,
+        "> Encrypted and saved to secure server.",
+      ]);
     } catch (err) {
       setOutput((prev) => [...prev, "> Submission Error: " + err.message]);
     } finally {

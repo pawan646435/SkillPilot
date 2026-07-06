@@ -1,41 +1,10 @@
 // src/components/PublicNavbar.jsx
 import { Link } from "react-router-dom";
 import { Terminal, ArrowRight, LayoutDashboard } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useAuth } from "../context/authContextStore";
 
 export default function PublicNavbar() {
-  const [user, setUser] = useState(null);
-
-  // Load Firebase auth lazily so public pages don't pull the full Firebase bundle immediately.
-  useEffect(() => {
-    let unsubscribe = () => {};
-    let isMounted = true;
-
-    const initAuthListener = async () => {
-      try {
-        const [{ auth }, { onAuthStateChanged }] = await Promise.all([
-          import("../lib/firebase"),
-          import("firebase/auth"),
-        ]);
-
-        if (!isMounted) return;
-
-        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-        });
-      } catch {
-        // Keep navbar functional even if auth listener fails.
-        setUser(null);
-      }
-    };
-
-    initAuthListener();
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, []);
+  const { user } = useAuth();
 
   return (
     <nav className="fixed top-0 w-full z-50 border-b border-white/10 bg-[#0a0a0a]/70 backdrop-blur-xl">

@@ -3,14 +3,15 @@ import { motion } from "framer-motion";
 import { Clock, Code2, AlertCircle, Loader2, ArrowRight, Shield } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
-import { db, auth } from "../lib/firebase";
+import { db } from "../lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, updateDoc } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { useAuth } from "../context/authContextStore";
 
 export default function InviteVerify() {
   const navigate = useNavigate();
   const { token } = useParams();
-  
+  const { user, authReady } = useAuth();
+
   const[status, setStatus] = useState("loading"); // loading, valid, expired, error
   const[assessment, setAssessment] = useState(null);
   const [invite, setInvite] = useState(null);
@@ -60,18 +61,17 @@ export default function InviteVerify() {
   }, [token]);
 
   useEffect(() => {
-    // 1. Ensure the user is logged in before they can view the invite
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (!user) {
-        // Redirect to login, but remember where to send them back!
-        navigate(`/login?redirect=${encodeURIComponent(`/assessment/invite/${token}`)}`);
-        return;
-      }
-      verifyInviteToken();
-    });
+    // Ensure the user is logged in before they can view the invite
+    if (!authReady) return;
 
-    return () => unsubscribe();
-  }, [token, navigate, verifyInviteToken]);
+    if (!user) {
+      // Redirect to login, but remember where to send them back!
+      navigate(`/login?redirect=${encodeURIComponent(`/assessment/invite/${token}`)}`);
+      return;
+    }
+
+    queueMicrotask(() => verifyInviteToken());
+  }, [authReady, user, token, navigate, verifyInviteToken]);
 
   const handleStart = async () => {
     // Mark the invite as ACCEPTED if they are starting the test

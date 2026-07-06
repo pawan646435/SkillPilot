@@ -1,40 +1,11 @@
 // src/pages/Home.jsx
-import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { ArrowRight, Terminal, Cpu, Crosshair, Trophy, Code2 } from "lucide-react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../context/authContextStore";
 
 export default function Home() {
-  const [user, setUser] = useState(null);
-
-  useEffect(() => {
-    let unsubscribe = () => {};
-    let isMounted = true;
-
-    const initAuthListener = async () => {
-      try {
-        const [{ auth }, { onAuthStateChanged }] = await Promise.all([
-          import("../lib/firebase"),
-          import("firebase/auth"),
-        ]);
-
-        if (!isMounted) return;
-
-        unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-          setUser(currentUser);
-        });
-      } catch {
-        setUser(null);
-      }
-    };
-
-    initAuthListener();
-
-    return () => {
-      isMounted = false;
-      unsubscribe();
-    };
-  }, []);
+  const { user } = useAuth();
 
   return (
     <main className="w-full min-h-screen overflow-hidden">

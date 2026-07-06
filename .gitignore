@@ -27,3 +27,5 @@ dist-ssr
 # Local history and env
 .history
 .env
+.vercel
+.env*

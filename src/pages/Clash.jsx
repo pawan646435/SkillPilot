@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import Editor from "@monaco-editor/react";
 import { auth, db } from "../lib/firebase";
 import { doc, setDoc, onSnapshot, updateDoc, serverTimestamp, collection, getDocs, query, where, orderBy, limit } from "firebase/firestore";
-import { onAuthStateChanged } from "firebase/auth";
+import { useAuth } from "../context/authContextStore";
 import { fetchClashQuestions, finalizeClashMatch, generateClashQuestions, joinClashRoom, runClashCode, submitClashAnswer } from "../services/clashService";
 
 // ── Stacks and Timer Options ──
@@ -188,6 +188,7 @@ const TerminalText = ({ text, delay = 0 }) => {
 // ══════════════════════════════════════════════
 export default function Clash() {
   const navigate = useNavigate();
+  const { user: authUser, authReady } = useAuth();
   const [searchParams] = useSearchParams();
   const roomFromUrl = searchParams.get("room");
   const syncTimerRef = useRef(null);
@@ -259,20 +260,21 @@ export default function Clash() {
   }, []);
 
   useEffect(() => {
+    if (!authReady) return;
+
     let bootTimer = null;
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        bootTimer = setTimeout(() => {
-          if (roomFromUrl) { handleJoinRoom(roomFromUrl); } else { setView("LOBBY"); }
-        }, 3500);
-      } else {
-        if (roomFromUrl) {
-          navigate(`/login?redirect=${encodeURIComponent('/clash?room=' + roomFromUrl)}`);
-        } else { navigate("/login"); }
-      }
-    });
-    return () => { unsubscribe(); if (bootTimer) clearTimeout(bootTimer); };
-  }, [navigate, roomFromUrl, handleJoinRoom]);
+    if (authUser) {
+      bootTimer = setTimeout(() => {
+        if (roomFromUrl) { handleJoinRoom(roomFromUrl); } else { setView("LOBBY"); }
+      }, 3500);
+    } else if (roomFromUrl) {
+      navigate(`/login?redirect=${encodeURIComponent('/clash?room=' + roomFromUrl)}`);
+    } else {
+      navigate("/login");
+    }
+
+    return () => { if (bootTimer) clearTimeout(bootTimer); };
+  }, [authReady, authUser, navigate, roomFromUrl, handleJoinRoom]);
 
   useEffect(() => {
     return () => {
