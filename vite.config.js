@@ -12,7 +12,10 @@ export default defineConfig({
 
           if (id.includes('firebase/')) return 'firebase'
           if (id.includes('react-router')) return 'router'
-          if (id.includes('react-dom') || id.includes('/react/')) return 'react-vendor'
+          // Match the react/react-dom packages themselves, not any package whose
+          // path merely contains "/react/" as a substring — this previously also
+          // matched @monaco-editor/react, leaking its loader into this eager chunk.
+          if (id.includes('/node_modules/react-dom/') || id.includes('/node_modules/react/')) return 'react-vendor'
           if (id.includes('framer-motion')) return 'motion'
           if (id.includes('lucide-react')) return 'icons'
         },

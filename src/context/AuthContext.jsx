@@ -1,5 +1,5 @@
 // src/context/AuthContext.jsx
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AuthContext } from "./authContextStore";
 
 // Loads firebase/auth lazily (matches the previous per-page pattern) so public pages
@@ -38,8 +38,10 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
+  const value = useMemo(() => ({ user, authReady }), [user, authReady]);
+
   return (
-    <AuthContext.Provider value={{ user, authReady }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
