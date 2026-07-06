@@ -3,6 +3,7 @@
 Replaces functions/index.js as the single entry point that wires up every
 route — the Cloud Run equivalent of "the functions this codebase exports".
 """
+import asyncio
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -17,7 +18,11 @@ from app.services.http_client import start_http_client, stop_http_client
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     await start_http_client()
+    # Fire-and-forget: pre-warms the jobs cache in the background so the
+    # container accepts traffic immediately rather than waiting on JSearch.
+    prewarm_task = asyncio.create_task(jobs.prewarm_loop())
     yield
+    prewarm_task.cancel()
     await stop_http_client()
 
 

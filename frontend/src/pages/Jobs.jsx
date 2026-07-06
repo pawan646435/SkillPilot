@@ -72,15 +72,23 @@ function getJobSourceLabel(source) {
   return "Job feed";
 }
 
-function JobsSkeleton() {
+function JobsSkeleton({ showSlowNotice }) {
   return (
-    <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 6 }).map((_, index) => (
-        <div
-          key={index}
-          className="h-[320px] rounded-[28px] border border-white/5 bg-white/[0.03] animate-pulse"
-        />
-      ))}
+    <div>
+      {showSlowNotice && (
+        <div className="mb-6 rounded-[20px] border border-emerald-400/20 bg-emerald-400/[0.06] px-5 py-3 text-sm text-emerald-100/90">
+          Fetching live listings for this category — this can take up to
+          15 seconds the first time. Cached categories load instantly.
+        </div>
+      )}
+      <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <div
+            key={index}
+            className="h-[320px] rounded-[28px] border border-white/5 bg-white/[0.03] animate-pulse"
+          />
+        ))}
+      </div>
     </div>
   );
 }
@@ -217,11 +225,26 @@ export default function Jobs() {
   const [jobs, setJobs] = useState([]);
   const [savedJobIds, setSavedJobIds] = useState({});
   const [loading, setLoading] = useState(true);
+  const [showSlowNotice, setShowSlowNotice] = useState(false);
   const [error, setError] = useState(null);
   const [savingJobId, setSavingJobId] = useState(null);
   const [lastFetchedAt, setLastFetchedAt] = useState(null);
   const [dataSource, setDataSource] = useState(null);
   const [activeCategory, setActiveCategory] = useState(JOB_CATEGORIES[0]);
+
+  // Cached categories resolve near-instantly; an uncached category genuinely
+  // waits on JSearch (measured 7-15s upstream). Rather than a bare spinner
+  // that looks stuck, surface an honest explanation once the wait has gone
+  // on long enough that it's clearly not a cache hit.
+  useEffect(() => {
+    if (!loading) {
+      setShowSlowNotice(false);
+      return;
+    }
+
+    const timer = setTimeout(() => setShowSlowNotice(true), 2000);
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   useEffect(() => {
     let active = true;
@@ -479,7 +502,7 @@ export default function Jobs() {
         )}
 
         {loading ? (
-          <JobsSkeleton />
+          <JobsSkeleton showSlowNotice={showSlowNotice} />
         ) : visibleJobs.length === 0 ? (
           <JobsEmpty categoryLabel={activeCategory.label} />
         ) : (

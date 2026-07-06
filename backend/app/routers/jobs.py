@@ -9,7 +9,16 @@ version that was actually serving production traffic.
 
 Per Task 2's auth carry-forward, this route (like news and groq-chat) now
 requires a signed-in caller, unlike the original anonymous-CORS Vercel route.
+
+Pre-warming: measured directly against production (see the monorepo
+restructure conversation), an uncached category pays JSearch's own upstream
+latency — 7-15s, not something our code can speed up. Since there are only
+5 fixed categories, `prewarm_all_categories` (called from main.py's lifespan
+at startup, and every ~110min after) fetches all 5 before real users need
+them, so the 7-15s wait is paid once per container per TTL window instead of
+once per user.
 """
+import asyncio
 import time
 import uuid
 
@@ -24,6 +33,7 @@ from app.services.http_client import get_http_client
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 CACHE_TTL_SECONDS = 2 * 60 * 60  # 2 hours, matches the Vercel route's in-memory cache
+PREWARM_INTERVAL_SECONDS = 110 * 60  # just under the TTL, so cache rarely goes cold
 
 CATEGORIES = {
     "software-dev": "Software Engineer",
@@ -102,35 +112,23 @@ def _normalize_job(item: dict, category: str) -> Job:
     )
 
 
-@router.get("", response_model=JobsResponse)
-async def fetch_jobs(
-    category: str = Query(default="software-dev"),
-    user: DecodedUser = Depends(require_auth),
-):
+async def _fetch_from_upstream(category: str) -> dict | None:
+    """Fetches one category from JSearch and writes it into `_mem_cache`.
+
+    Returns the new cache entry on success, or None on any failure (missing
+    key, upstream error, timed-out retry) — the caller decides what error
+    response to surface, if any. Shared by the request-time cache-miss path
+    and the startup/periodic pre-warm task so there's exactly one place that
+    talks to JSearch.
+    """
     role = CATEGORIES.get(category, "Software Engineer")
     cache_key = f"jobs_india_{category}"
-
-    cached = _get_cached(cache_key)
-    if cached:
-        return JobsResponse(
-            jobs=cached["jobs"],
-            fetchedAt=cached["fetched_at"],
-            source="cache",
-            category=category,
-            role=role,
-        )
 
     if DEBUG:
         print(f"[jobs] JSEARCH_API_KEY configured: {bool(JSEARCH_API_KEY)}, category={category}, cache_hit=False")
 
     if not JSEARCH_API_KEY:
-        return JobsResponse(
-            jobs=[],
-            source="provider-unavailable",
-            error="JSEARCH_API_KEY environment variable is not configured. Get a free key at https://rapidapi.com/letscrape-6bRBa3Q3OEd/api/jsearch",
-            category=category,
-            role=role,
-        )
+        return None
 
     try:
         search_query = f"{role} in India"
@@ -174,13 +172,7 @@ async def fetch_jobs(
         if response.status_code >= 400:
             if DEBUG:
                 print(f"[jobs] JSearch upstream error body: {response.text[:500]}")
-            return JobsResponse(
-                jobs=[],
-                source="provider-unavailable",
-                error=f"JSearch returned HTTP {response.status_code}",
-                category=category,
-                role=role,
-            )
+            return None
 
         payload = response.json()
         raw_jobs = payload.get("data") or []
@@ -190,27 +182,85 @@ async def fetch_jobs(
             print(f"[jobs] JSearch returned {len(raw_jobs)} raw results, {len(jobs)} after normalization")
 
         now = time.time()
-        _mem_cache[cache_key] = {
+        entry = {
             "jobs": jobs,
             "timestamp": now,
             "fetched_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(now)),
         }
-
-        return JobsResponse(
-            jobs=jobs,
-            fetchedAt=_mem_cache[cache_key]["fetched_at"],
-            source="upstream",
-            category=category,
-            role=role,
-            total=len(jobs),
-        )
+        _mem_cache[cache_key] = entry
+        return entry
     except httpx.HTTPError as exc:
         if DEBUG:
             print(f"[jobs] httpx request FAILED: {type(exc).__name__}: {exc}")
+        return None
+
+
+async def prewarm_all_categories() -> None:
+    """Fetches and caches every category once. Errors per-category are
+    logged and skipped — one bad category shouldn't stop the rest."""
+    for category in CATEGORIES:
+        start = time.time()
+        entry = await _fetch_from_upstream(category)
+        elapsed = time.time() - start
+        if entry:
+            print(f"[jobs-prewarm] {category}: warmed in {elapsed:.1f}s, {len(entry['jobs'])} jobs cached")
+        else:
+            print(f"[jobs-prewarm] {category}: FAILED to warm after {elapsed:.1f}s (JSearch error or missing key)")
+
+
+async def prewarm_loop() -> None:
+    """Fire-and-forget background loop: warm all categories at startup,
+    then again every PREWARM_INTERVAL_SECONDS so the cache rarely goes fully
+    cold during normal usage. Cancelled cleanly on app shutdown."""
+    while True:
+        print("[jobs-prewarm] starting pre-warm pass for all categories")
+        await prewarm_all_categories()
+        print(f"[jobs-prewarm] pass complete, next pass in {PREWARM_INTERVAL_SECONDS}s")
+        await asyncio.sleep(PREWARM_INTERVAL_SECONDS)
+
+
+@router.get("", response_model=JobsResponse)
+async def fetch_jobs(
+    category: str = Query(default="software-dev"),
+    user: DecodedUser = Depends(require_auth),
+):
+    role = CATEGORIES.get(category, "Software Engineer")
+    cache_key = f"jobs_india_{category}"
+
+    cached = _get_cached(cache_key)
+    if cached:
         return JobsResponse(
-            jobs=[],
-            source="provider-unavailable",
-            error=str(exc) or "Unexpected error fetching jobs",
+            jobs=cached["jobs"],
+            fetchedAt=cached["fetched_at"],
+            source="cache",
             category=category,
             role=role,
         )
+
+    if not JSEARCH_API_KEY:
+        return JobsResponse(
+            jobs=[],
+            source="provider-unavailable",
+            error="JSEARCH_API_KEY environment variable is not configured. Get a free key at https://rapidapi.com/letscrape-6bRBa3Q3OEd/api/jsearch",
+            category=category,
+            role=role,
+        )
+
+    entry = await _fetch_from_upstream(category)
+    if entry is None:
+        return JobsResponse(
+            jobs=[],
+            source="provider-unavailable",
+            error="Unexpected error fetching jobs",
+            category=category,
+            role=role,
+        )
+
+    return JobsResponse(
+        jobs=entry["jobs"],
+        fetchedAt=entry["fetched_at"],
+        source="upstream",
+        category=category,
+        role=role,
+        total=len(entry["jobs"]),
+    )
