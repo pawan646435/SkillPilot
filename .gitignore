@@ -22,10 +22,24 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
 
 # Local history and env
 .history
-.env
 .vercel
-.env*
+
+# Environment files (all envs, except example templates)
+.env
+.env.*
+!.env.example
+
+# Python (backend)
+__pycache__/
+*.pyc
+venv/
+.venv/
+.pytest_cache/
+
+# Secrets
+*service-account*.json
+*credentials*.json
+*.pem

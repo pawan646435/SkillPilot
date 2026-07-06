@@ -1,90 +1,52 @@
-# SkillPilot 🚀
+# SkillPilot
 
-SkillPilot is a sophisticated, AI-enhanced platform designed for modern interview preparation, coding assessments, and competitive real-time coding experiences. It bridges the gap between learning and hiring by providing high-fidelity simulations for both candidates and recruiters.
+SkillPilot is an AI-enhanced platform for interview preparation, coding assessments, and competitive real-time coding. It combines AI-driven mock interviews, a real-time 1v1 code battle mode ("Code Clash") across multiple languages, recruiter-run assessments, and a career hub (jobs + tech news) in one product.
 
----
+## Monorepo structure
 
-## 🏗️ Project Architecture
+```
+SkillPilot/
+├── frontend/   React 19 + Vite SPA — the main app UI
+├── backend/    FastAPI service (Cloud Run) — AI interviews, Code Clash judge, assessments, jobs/news proxies
+├── firebase/   Firebase project config — Firestore rules/indexes, .firebaserc (no functions code; auth/Firestore only)
+└── docs/       Deeper explanation docs (e.g. the backend migration writeup)
+```
 
-SkillPilot follows a modern **Serverless/Micro-Backend architecture** designed for scalability and low-latency real-time interactions:
-
-- **Frontend Hub**: A high-performance Single Page Application (SPA) built with React and Vite. It leverages real-time listeners for collaborative features (like Code Battles) and a modular component system for a premium user experience.
-- **Backend Infrastructure**: Powered by **Firebase Cloud Functions (Generation 2)**. This layer acts as a secure proxy to sensitive external APIs and handles complex server-side logic (e.g., code evaluation, AI interview processing, scheduling).
-- **Real-time Engine**: Utilizes **Firestore** for multi-user synchronization in Code Battles and high-availability data storage.
-- **AI Domain**: Integrates **LLM (Groq)** via proxy functions to handle live interview persona simulation and final feedback reporting.
-
----
-
-## 🛠️ Tech Stack
+## Local development
 
 ### Frontend
-- **Core**: React 19 + Vite 7 (High-speed HMR and build optimization)
-- **Styling**: Vanilla CSS + Tailwind CSS (Custom glassmorphism design system)
-- **Animations**: Framer Motion (Fluid transitions and micro-interactions)
-- **Icons**: Lucide React
-- **Editor**: Monaco Editor (The core of VS Code) for the IDE experience
 
-### Backend & Infrastructure
-- **Cloud Provider**: Google Firebase (deployed in `asia-south1`)
-- **Serverless**: Firebase Cloud Functions (Node.js)
-- **Database**: Firestore (NoSQL, real-time sync)
-- **Authentication**: Firebase Auth (Social Login + Email/Password)
-- **Secret Management**: `.env` driven backend configurations
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-### External Integrations
-- **AI Engine**: Groq SDK (Powered by Llama 3 / Mixtral)
-- **Job Engine**: JSearch API (Optimized for India-only job discovery)
-- **News Engine**: GNews API (Personalized tech news feed)
+Requires a `.env` with your Firebase web config and `VITE_API_BASE_URL` pointing at the backend (see `frontend/.env.example` if present, or `backend/README.md` for the corresponding backend env vars).
 
----
+### Backend
 
-## 🌟 Key Features
+```bash
+cd backend
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env   # fill in GROQ_API_KEY, GNEWS_API_KEY, JSEARCH_API_KEY
+uvicorn app.main:app --reload --port 8000
+```
 
-### ⚔️ Code Battle (Clash)
-- Real-time 1v1 coding competitions.
-- Automatic question generation with categories like DSA, System Design, and Frontend.
-- Live opponent activity tracking.
-- Intelligent code execution and test-case evaluation.
-- Dynamic randomization ensuring unique question sets every battle.
+Full setup details (Firestore/Auth credentials, emulator suite, language runtimes needed by the code judge) are in [backend/README.md](backend/README.md).
 
-### 🤖 AI Interviews
-- Voice and text-based interactive interviews.
-- Real-time AI feedback and professional performance reports.
-- Customizable difficulty and stack selection.
+## Deployment
 
-### 💼 Career Hub
-- India-only job search engine powered by real-time data.
-- Personalized tech news feed to stay updated with the industry.
+- **Frontend** deploys to **Vercel** on push to `main`. The Vercel project's Root Directory setting is `frontend`.
+- **Backend** deploys to **Google Cloud Run**. See [backend/README.md](backend/README.md) for the full `gcloud run deploy` walkthrough and secrets setup; a documented `backend/deploy.sh` script is provided as reference (not run automatically).
+- **Firestore rules/indexes** deploy via Firebase CLI from the `firebase/` directory:
+  ```bash
+  cd firebase
+  firebase deploy --only firestore:rules
+  ```
 
-### 📊 Recruiter Dashboard
-- End-to-end assessment management.
-- Candidate invitation system.
-- Detailed result analytics and problem creation suite.
+## Docs
 
----
-
-## 🚀 Getting Started
-
-### Prerequisites
-- Node.js (v18+)
-- npm or yarn
-
-### Installation
-1. Clone the repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-3. Setup Firebase:
-   - Ensure your Firebase project is configured in `src/lib/firebase.js`.
-   - Deploy backend functions located in `firebase-backend/proxy functions for api key/functions`.
-4. Run locally:
-   ```bash
-   npm run dev
-   ```
-
----
-
-## 👤 Credits
-
-**Made with ❤️ by Pawan**
+See [docs/](docs/) for deeper explanations, including the writeup on why the backend migrated from Firebase Cloud Functions to a standalone FastAPI service on Cloud Run.

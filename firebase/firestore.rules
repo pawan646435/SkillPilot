@@ -1,0 +1,82 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isSignedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == "ADMIN";
+    }
+
+    function isParticipant(data) {
+      return data.player1.uid == request.auth.uid || (data.player2 != null && data.player2.uid == request.auth.uid);
+    }
+
+    function isJoiningAsPlayer2() {
+      return isSignedIn()
+        && resource.data.status == "WAITING"
+        && resource.data.player2 == null
+        && request.resource.data.player1.uid == resource.data.player1.uid
+        && request.resource.data.player2.uid == request.auth.uid;
+    }
+
+    match /users/{userId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.role == "USER";
+      allow update: if isSignedIn()
+        && request.auth.uid == userId
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.role == resource.data.role;
+      allow delete: if false;
+    }
+
+    // Allow users to save and read their own AI interview reports
+    match /users/{userId}/interviewReports/{reportId} {
+      allow read: if isSignedIn() && request.auth.uid == userId;
+      allow create: if isSignedIn() && request.auth.uid == userId;
+      allow update, delete: if false;
+    }
+
+    match /clashQuestions/{questionId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /battles/{roomId} {
+      allow read: if isSignedIn() && (
+        isParticipant(resource.data) ||
+        resource.data.status == "WAITING"
+      );
+      allow create: if isSignedIn() && request.resource.data.player1.uid == request.auth.uid;
+      allow update: if isSignedIn() && (isParticipant(resource.data) || isJoiningAsPlayer2());
+      allow delete: if false;
+    }
+
+    match /savedJobs/{userId}/jobs/{jobId} {
+      allow read, create, delete: if isSignedIn() && request.auth.uid == userId;
+      allow update: if false;
+    }
+
+    match /problems/{problemId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /assessments/{assessmentId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /invites/{inviteId} {
+      allow read, write: if isSignedIn();
+    }
+
+    match /submissions/{submissionId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}
