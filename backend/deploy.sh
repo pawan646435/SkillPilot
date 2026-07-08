@@ -28,7 +28,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --max-instances=3 \
   --memory=1Gi \
   --cpu=1 \
-  --timeout=30s \
+  --timeout=120s \
   --set-env-vars="FIREBASE_PROJECT_ID=${PROJECT_ID},DEBUG=false" \
   --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,CURRENTS_API_KEY=CURRENTS_API_KEY:latest,GNEWS_API_KEY=GNEWS_API_KEY:latest,JSEARCH_API_KEY=JSEARCH_API_KEY:latest,PREWARM_SECRET=PREWARM_SECRET:latest"
 
