@@ -34,6 +34,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
 JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
+PREWARM_SECRET = os.getenv("PREWARM_SECRET", "")
 
 GROQ_MODEL = "llama-3.3-70b-versatile"
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"

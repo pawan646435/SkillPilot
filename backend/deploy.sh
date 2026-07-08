@@ -27,7 +27,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --cpu=1 \
   --timeout=30s \
   --set-env-vars="FIREBASE_PROJECT_ID=${PROJECT_ID},DEBUG=false" \
-  --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,GNEWS_API_KEY=GNEWS_API_KEY:latest,JSEARCH_API_KEY=JSEARCH_API_KEY:latest"
+  --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,GNEWS_API_KEY=GNEWS_API_KEY:latest,JSEARCH_API_KEY=JSEARCH_API_KEY:latest,PREWARM_SECRET=PREWARM_SECRET:latest"
 
 echo "Deployed. Fetch the service URL with:"
 echo "  gcloud run services describe ${SERVICE_NAME} --region ${REGION} --project ${PROJECT_ID} --format='value(status.url)'"

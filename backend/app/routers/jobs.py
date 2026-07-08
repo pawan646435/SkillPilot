@@ -13,27 +13,30 @@ requires a signed-in caller, unlike the original anonymous-CORS Vercel route.
 Pre-warming: measured directly against production (see the monorepo
 restructure conversation), an uncached category pays JSearch's own upstream
 latency — 7-15s, not something our code can speed up. Since there are only
-5 fixed categories, `prewarm_all_categories` (called from main.py's lifespan
-at startup, and every ~110min after) fetches all 5 before real users need
-them, so the 7-15s wait is paid once per container per TTL window instead of
-once per user.
+5 fixed categories, they used to be warmed by an in-process fire-and-forget
+asyncio loop — but Cloud Run throttles CPU on an idle instance between
+requests, so that background loop couldn't be trusted to actually run on
+schedule. Warming is now driven externally instead: `POST
+/internal/prewarm-jobs` (secret-protected) synchronously warms all 5
+categories and is hit by a GitHub Actions cron every 90 minutes, which
+guarantees the container is actively handling a request (and therefore
+getting real CPU) while it warms.
 """
-import asyncio
 import time
 import uuid
 
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from pydantic import BaseModel
 
-from app.config import DEBUG, JSEARCH_API_KEY
+from app.config import DEBUG, JSEARCH_API_KEY, PREWARM_SECRET
 from app.dependencies.auth import DecodedUser, require_auth
 from app.services.http_client import get_http_client
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
+internal_router = APIRouter(tags=["internal"])
 
 CACHE_TTL_SECONDS = 2 * 60 * 60  # 2 hours, matches the Vercel route's in-memory cache
-PREWARM_INTERVAL_SECONDS = 110 * 60  # just under the TTL, so cache rarely goes cold
 
 CATEGORIES = {
     "software-dev": "Software Engineer",
@@ -195,28 +198,52 @@ async def _fetch_from_upstream(category: str) -> dict | None:
         return None
 
 
-async def prewarm_all_categories() -> None:
-    """Fetches and caches every category once. Errors per-category are
-    logged and skipped — one bad category shouldn't stop the rest."""
+class PrewarmCategoryResult(BaseModel):
+    category: str
+    success: bool
+    elapsed_seconds: float
+    jobs_cached: int | None = None
+    error: str | None = None
+
+
+class PrewarmResponse(BaseModel):
+    results: list[PrewarmCategoryResult]
+
+
+@internal_router.post("/internal/prewarm-jobs", response_model=PrewarmResponse)
+async def prewarm_jobs_endpoint(x_prewarm_secret: str | None = Header(default=None)) -> PrewarmResponse:
+    """Synchronously warms all 5 categories and returns a per-category
+    success/timing summary. Called by the GitHub Actions cron (every
+    90min) rather than run in-process, since Cloud Run throttles CPU on an
+    idle instance and can't be trusted to run a background loop on schedule.
+    """
+    if not PREWARM_SECRET or x_prewarm_secret != PREWARM_SECRET:
+        raise HTTPException(status_code=403, detail="Missing or invalid X-Prewarm-Secret header")
+
+    results: list[PrewarmCategoryResult] = []
     for category in CATEGORIES:
         start = time.time()
         entry = await _fetch_from_upstream(category)
         elapsed = time.time() - start
         if entry:
-            print(f"[jobs-prewarm] {category}: warmed in {elapsed:.1f}s, {len(entry['jobs'])} jobs cached")
+            results.append(
+                PrewarmCategoryResult(
+                    category=category,
+                    success=True,
+                    elapsed_seconds=round(elapsed, 2),
+                    jobs_cached=len(entry["jobs"]),
+                )
+            )
         else:
-            print(f"[jobs-prewarm] {category}: FAILED to warm after {elapsed:.1f}s (JSearch error or missing key)")
-
-
-async def prewarm_loop() -> None:
-    """Fire-and-forget background loop: warm all categories at startup,
-    then again every PREWARM_INTERVAL_SECONDS so the cache rarely goes fully
-    cold during normal usage. Cancelled cleanly on app shutdown."""
-    while True:
-        print("[jobs-prewarm] starting pre-warm pass for all categories")
-        await prewarm_all_categories()
-        print(f"[jobs-prewarm] pass complete, next pass in {PREWARM_INTERVAL_SECONDS}s")
-        await asyncio.sleep(PREWARM_INTERVAL_SECONDS)
+            results.append(
+                PrewarmCategoryResult(
+                    category=category,
+                    success=False,
+                    elapsed_seconds=round(elapsed, 2),
+                    error="JSearch error or missing key",
+                )
+            )
+    return PrewarmResponse(results=results)
 
 
 @router.get("", response_model=JobsResponse)

@@ -1,0 +1,33 @@
+name: Prewarm jobs cache
+
+on:
+  schedule:
+    # Cron minutes only go 0-59, so "every 90 minutes" isn't a single
+    # expression — two alternating entries (even hours at :00, odd hours
+    # at :30) produce the same exact 90-minute cadence: 00:00, 01:30,
+    # 03:00, 04:30, ...
+    - cron: '0 0,2,4,6,8,10,12,14,16,18,20,22 * * *'
+    - cron: '30 1,3,5,7,9,11,13,15,17,19,21,23 * * *'
+  workflow_dispatch:
+
+jobs:
+  prewarm:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call prewarm endpoint
+        run: |
+          http_code=$(curl -s -o /tmp/response.json -w "%{http_code}" -X POST \
+            "https://skillpilot-api-782768669643.asia-south1.run.app/internal/prewarm-jobs" \
+            -H "X-Prewarm-Secret: ${{ secrets.PREWARM_SECRET }}")
+
+          echo "Response body:"
+          cat /tmp/response.json
+          echo
+
+          if [ "$http_code" != "200" ]; then
+            echo "Prewarm request failed with HTTP $http_code"
+            exit 1
+          fi
+
+          echo "Prewarm request succeeded with HTTP $http_code"
