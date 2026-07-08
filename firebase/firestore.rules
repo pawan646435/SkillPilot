@@ -58,6 +58,21 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    // RAG context ingestion (AI Interview Panel, Stage 1). Writes only ever
+    // happen through the FastAPI backend's admin-SDK client, which bypasses
+    // these rules entirely — real access control is require_auth + the
+    // uid ownership check in routers/rag.py. These rules are defense-in-depth
+    // for the day something reads this collection from a client context.
+    match /interviewSessions/{sessionId} {
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+
+      match /contextChunks/{chunkId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/interviewSessions/$(sessionId)).data.uid == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
     match /savedJobs/{userId}/jobs/{jobId} {
       allow read, create, delete: if isSignedIn() && request.auth.uid == userId;
       allow update: if false;

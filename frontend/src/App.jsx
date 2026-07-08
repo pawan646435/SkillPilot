@@ -55,6 +55,9 @@ const InterviewSetup = lazy(() => import("./pages/InterviewSetup"));
 const InterviewRoom = lazy(() => import("./pages/InterviewRoom"));
 const InterviewReport = lazy(() => import("./pages/InterviewReport"));
 
+// Dev-only test pages (not linked from any nav)
+const RagIngestTest = lazy(() => import("./pages/dev/RagIngestTest"));
+
 function RouteFallback() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-[#0a0a0a] text-neutral-400 font-mono text-sm">
@@ -92,6 +95,9 @@ function App() {
             {/* AI INTERVIEW - Full screen for room & report */}
             <Route path="/interview/room" element={<InterviewRoom />} />
             <Route path="/interview/report" element={<InterviewReport />} />
+
+            {/* DEV-ONLY TEST PAGES */}
+            <Route path="/dev/rag-ingest-test" element={<RagIngestTest />} />
 
             {/* DASHBOARD ROUTES WITH SIDEBAR */}
             <Route path="/dashboard" element={<DashboardLayout />}>
