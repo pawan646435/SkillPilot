@@ -32,6 +32,7 @@ DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
 GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
+CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY", "")
 JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")
 PREWARM_SECRET = os.getenv("PREWARM_SECRET", "")
