@@ -11,7 +11,7 @@ async function authHeaders() {
   };
 }
 
-async function postJson(path, payload) {
+export async function postJson(path, payload) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method: "POST",
     headers: await authHeaders(),

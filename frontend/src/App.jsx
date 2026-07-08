@@ -57,6 +57,7 @@ const InterviewReport = lazy(() => import("./pages/InterviewReport"));
 
 // Dev-only test pages (not linked from any nav)
 const RagIngestTest = lazy(() => import("./pages/dev/RagIngestTest"));
+const PanelTest = lazy(() => import("./pages/dev/PanelTest"));
 
 function RouteFallback() {
   return (
@@ -98,6 +99,7 @@ function App() {
 
             {/* DEV-ONLY TEST PAGES */}
             <Route path="/dev/rag-ingest-test" element={<RagIngestTest />} />
+            <Route path="/dev/panel-test" element={<PanelTest />} />
 
             {/* DASHBOARD ROUTES WITH SIDEBAR */}
             <Route path="/dashboard" element={<DashboardLayout />}>

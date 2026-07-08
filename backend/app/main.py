@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from app.config import CORS_ALLOW_ORIGIN_REGEX, CORS_ALLOW_ORIGINS
-from app.routers import assessments, clash, interview, jobs, news, rag
+from app.routers import assessments, clash, interview, jobs, news, panel, rag
 from app.services.http_client import start_http_client, stop_http_client
 
 
@@ -42,6 +42,7 @@ app.include_router(jobs.router)
 app.include_router(jobs.internal_router)
 app.include_router(news.router)
 app.include_router(rag.router)
+app.include_router(panel.router)
 
 
 @app.get("/health")

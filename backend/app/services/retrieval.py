@@ -38,6 +38,7 @@ async def retrieve_relevant_chunks(session_id: str, query_text: str, top_k: int 
 
     scored = [
         {
+            "id": doc.id,
             "text": doc.to_dict()["text"],
             "order": doc.to_dict()["order"],
             "similarity": _cosine_similarity(query_vector, doc.to_dict()["embedding"]),

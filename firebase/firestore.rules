@@ -71,6 +71,14 @@ service cloud.firestore {
         allow read: if isSignedIn() && get(/databases/$(database)/documents/interviewSessions/$(sessionId)).data.uid == request.auth.uid;
         allow write: if false;
       }
+
+      // Interview panel turns (Stage 2). Same trust model as contextChunks:
+      // only the backend (admin SDK, rules bypassed) ever writes; owner may
+      // read their own transcript from a client context.
+      match /turns/{turnId} {
+        allow read: if isSignedIn() && get(/databases/$(database)/documents/interviewSessions/$(sessionId)).data.uid == request.auth.uid;
+        allow write: if false;
+      }
     }
 
     match /savedJobs/{userId}/jobs/{jobId} {
