@@ -9,7 +9,7 @@
 // by the same persona, and the run ends with the Panel Lead's report.
 import { useState } from "react";
 import { useAuth } from "../../context/authContextStore";
-import { nextTurn, startPanel, submitAnswer } from "../../services/panelService";
+import { nextTurn, nextTurnStream, startPanel, submitAnswer } from "../../services/panelService";
 
 const AGENT_LABELS = {
   technical: "Technical Interviewer",
@@ -27,6 +27,11 @@ export default function PanelTest() {
   const [finalReport, setFinalReport] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // Stage 3: live streaming state. streaming is null when idle; while a
+  // stream is active it holds {agent, text} and `text` grows delta by
+  // delta — that growth IS the visible proof the tokens arrive one at a
+  // time rather than all at once.
+  const [streaming, setStreaming] = useState(null);
 
   function pushEvent(event) {
     setEvents((prev) => [...prev, event]);
@@ -58,6 +63,50 @@ export default function PanelTest() {
     if (!data) return;
     pushEvent({ kind: data.action, ...data });
     if (data.action === "question" || data.action === "awaiting_answer") {
+      setPendingTurn({ turn_id: data.turn_id, agent: data.agent, question: data.question });
+    }
+    if (data.action === "synthesis") setFinalReport(data.report);
+    if (data.action === "complete") setFinalReport(data.final_report);
+  }
+
+  async function handleNextTurnStream() {
+    let meta = null;
+    const data = await run(() =>
+      nextTurnStream(sessionId, (event) => {
+        if (event.type === "meta") {
+          meta = event;
+          setStreaming({ agent: event.agent, text: "" });
+        } else if (event.type === "delta") {
+          // Functional update: each delta appends to whatever has already
+          // rendered, so the question grows on screen token by token.
+          setStreaming((prev) => (prev ? { ...prev, text: prev.text + event.text } : prev));
+        }
+      })
+    );
+    setStreaming(null);
+    if (!data) return;
+
+    if (data.type === "done") {
+      // Reuse the existing question-card rendering, including the
+      // retrieval detail captured from the meta event.
+      pushEvent({
+        kind: "question",
+        streamed: true,
+        turn_id: data.turn_id,
+        agent: data.agent,
+        question: data.question,
+        used_fallback: data.used_fallback,
+        retrieval_query: meta?.retrieval_query,
+        retrieved_chunks: meta?.retrieved_chunks,
+      });
+      setPendingTurn({ turn_id: data.turn_id, agent: data.agent, question: data.question });
+      return;
+    }
+
+    // Single-event actions (awaiting_answer / synthesis / complete) come
+    // through with type "action" — same handling as the buffered endpoint.
+    pushEvent({ kind: data.action, ...data });
+    if (data.action === "awaiting_answer") {
       setPendingTurn({ turn_id: data.turn_id, agent: data.agent, question: data.question });
     }
     if (data.action === "synthesis") setFinalReport(data.report);
@@ -105,17 +154,38 @@ export default function PanelTest() {
                 {loading ? "Starting..." : "Start panel"}
               </button>
             ) : (
-              <button
-                onClick={handleNextTurn}
-                disabled={loading || !!pendingTurn || !!finalReport}
-                className="bg-sky-600 hover:bg-sky-500 disabled:bg-neutral-700 disabled:text-neutral-500 text-black font-semibold px-4 py-2 rounded"
-              >
-                {loading ? "Working..." : "Next turn"}
-              </button>
+              <>
+                <button
+                  onClick={handleNextTurn}
+                  disabled={loading || !!pendingTurn || !!finalReport}
+                  className="bg-sky-600 hover:bg-sky-500 disabled:bg-neutral-700 disabled:text-neutral-500 text-black font-semibold px-4 py-2 rounded"
+                >
+                  {loading ? "Working..." : "Next turn"}
+                </button>
+                <button
+                  onClick={handleNextTurnStream}
+                  disabled={loading || !!pendingTurn || !!finalReport}
+                  className="bg-fuchsia-600 hover:bg-fuchsia-500 disabled:bg-neutral-700 disabled:text-neutral-500 text-black font-semibold px-4 py-2 rounded whitespace-nowrap"
+                >
+                  {loading ? "Working..." : "Next turn (stream)"}
+                </button>
+              </>
             )}
           </div>
 
           {error && <p className="text-rose-400 mb-4 text-sm">{error}</p>}
+
+          {streaming && (
+            <div className="border border-fuchsia-800 rounded p-3 mb-4 text-sm">
+              <p className="text-fuchsia-400 mb-1">
+                {AGENT_LABELS[streaming.agent] || streaming.agent} is typing (streaming live)…
+              </p>
+              <p className="whitespace-pre-wrap">
+                {streaming.text}
+                <span className="animate-pulse text-fuchsia-400">▌</span>
+              </p>
+            </div>
+          )}
 
           <div className="space-y-4 text-sm">
             {events.map((event, i) => (
@@ -130,7 +200,8 @@ export default function PanelTest() {
                 {(event.kind === "question" || event.kind === "awaiting_answer") && (
                   <>
                     <p className="text-sky-400 mb-1">
-                      {AGENT_LABELS[event.agent]} asks{event.kind === "awaiting_answer" ? " (pending)" : ""}:
+                      {AGENT_LABELS[event.agent]} asks{event.kind === "awaiting_answer" ? " (pending)" : ""}
+                      {event.streamed ? <span className="text-fuchsia-400"> [streamed]</span> : ""}:
                     </p>
                     <p className="mb-2 whitespace-pre-wrap">{event.question}</p>
                     {event.retrieval_query && (

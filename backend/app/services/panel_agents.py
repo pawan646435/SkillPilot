@@ -190,18 +190,21 @@ async def _write_turn(session_id: str, data: dict) -> str:
     return doc_ref.id
 
 
-async def _generate_question(session_id: str, agent: str, turn_number: int) -> dict:
-    """Shared question-turn pipeline for the two resume-grounded agents:
-    retrieve with this agent's query -> threshold check -> build prompt
-    (grounded or fallback) -> Groq -> persist turn."""
+async def prepare_question_turn(session_id: str, agent: str, turn_number: int) -> dict:
+    """Everything a question turn needs BEFORE the LLM speaks: pick this
+    agent's retrieval query, retrieve, apply the similarity threshold, and
+    collect the agent's previous questions. Split out of _generate_question
+    in Stage 3 so the streaming endpoint runs the identical retrieval/
+    fallback logic without duplicating it — same inputs in, same grounding
+    decisions out, regardless of how the completion is then fetched."""
     queries = AGENT_RETRIEVAL_QUERIES[agent]
     query = queries[(turn_number - 1) % len(queries)]
 
     retrieved = await retrieve_relevant_chunks(session_id, query, top_k=_RETRIEVAL_TOP_K)
 
-    # Task 3: trust retrieval only if its single best match clears the noise
-    # floor. Chunks below the threshold are dropped even when the top passes,
-    # so a strong #1 never drags an unrelated #2 into the prompt with it.
+    # Task 3 (Stage 2): trust retrieval only if its single best match clears
+    # the noise floor. Chunks below the threshold are dropped even when the
+    # top passes, so a strong #1 never drags an unrelated #2 into the prompt.
     used_fallback = not retrieved or retrieved[0]["similarity"] < MIN_TOP_SIMILARITY
     chunks = [] if used_fallback else [c for c in retrieved if c["similarity"] >= MIN_TOP_SIMILARITY]
 
@@ -210,34 +213,46 @@ async def _generate_question(session_id: str, agent: str, turn_number: int) -> d
         if t["agent"] == agent and t["type"] == "question"
     ]
 
-    data = await groq_client.fetch_groq_json([
-        {"role": "system", "content": _PERSONA_SYSTEM_PROMPTS[agent]},
-        {"role": "user", "content": _question_user_prompt(agent, _context_block(chunks), previous_questions)},
-    ])
+    return {
+        "agent": agent,
+        "query": query,
+        "retrieved": retrieved,
+        "chunks": chunks,
+        "used_fallback": used_fallback,
+        "previous_questions": previous_questions,
+    }
 
-    question = str(data.get("question", "")).strip()
-    if not question:
-        raise groq_client.GroqError("Model returned an empty question.", 500)
+
+async def persist_question_turn(session_id: str, prep: dict, question: str, topic: str) -> dict:
+    """Writes the question turn doc — the single Firestore write for this
+    turn, shared verbatim by the buffered and streaming paths so both
+    produce identically-shaped documents. For the streaming path this runs
+    only after the full stream has been consumed: the turns collection IS
+    the orchestrator's state, so a turn must either fully exist or not
+    exist at all — a partial question written mid-stream would advance the
+    interview past a question the candidate never saw."""
+    retrieved = prep["retrieved"]
+    chunks = prep["chunks"]
 
     turn_id = await _write_turn(session_id, {
-        "agent": agent,
+        "agent": prep["agent"],
         "type": "question",
         "content": question,
-        "topic": str(data.get("topic", "")),
+        "topic": topic,
         "retrievedChunkIds": [c["id"] for c in chunks],
-        "usedFallback": used_fallback,
-        "retrievalQuery": query,
+        "usedFallback": prep["used_fallback"],
+        "retrievalQuery": prep["query"],
         "topSimilarity": retrieved[0]["similarity"] if retrieved else None,
     })
 
     return {
         "turn_id": turn_id,
-        "agent": agent,
+        "agent": prep["agent"],
         "type": "question",
         "question": question,
-        "topic": str(data.get("topic", "")),
-        "used_fallback": used_fallback,
-        "retrieval_query": query,
+        "topic": topic,
+        "used_fallback": prep["used_fallback"],
+        "retrieval_query": prep["query"],
         # Full retrieval detail (including rejected chunks' scores) goes back
         # to the caller for the dev test page; only the injected chunks' IDs
         # are persisted on the turn itself.
@@ -246,6 +261,47 @@ async def _generate_question(session_id: str, agent: str, turn_number: int) -> d
             for c in retrieved
         ],
     }
+
+
+def question_messages(prep: dict) -> list[dict]:
+    """Prompt messages for the buffered (JSON-mode) question call."""
+    return [
+        {"role": "system", "content": _PERSONA_SYSTEM_PROMPTS[prep["agent"]]},
+        {"role": "user", "content": _question_user_prompt(
+            prep["agent"], _context_block(prep["chunks"]), prep["previous_questions"])},
+    ]
+
+
+def question_messages_plain(prep: dict) -> list[dict]:
+    """Prompt messages for the STREAMING question call: identical persona,
+    context block, and history — only the response-format instruction
+    differs (plain text instead of a JSON object), because streaming JSON
+    syntax character-by-character at a user is unreadable. Known trade-off:
+    no topic label comes back on this path (streamed turns store topic="");
+    both paths still tag promptVersion=panel-v1 even though this format
+    instruction differs — a production system would version the variant."""
+    base = _question_user_prompt(prep["agent"], _context_block(prep["chunks"]), prep["previous_questions"])
+    # Swap the JSON-format contract for a plain-text one.
+    plain = base.split("You MUST respond ONLY with")[0].rstrip()
+    plain += "\n\nRespond with ONLY the question text itself — no JSON, no preamble, no quotes."
+    return [
+        {"role": "system", "content": _PERSONA_SYSTEM_PROMPTS[prep["agent"]]},
+        {"role": "user", "content": plain},
+    ]
+
+
+async def _generate_question(session_id: str, agent: str, turn_number: int) -> dict:
+    """Buffered question-turn pipeline (Stage 2 behavior, unchanged):
+    prepare (retrieve + threshold) -> Groq JSON call -> persist turn."""
+    prep = await prepare_question_turn(session_id, agent, turn_number)
+
+    data = await groq_client.fetch_groq_json(question_messages(prep))
+
+    question = str(data.get("question", "")).strip()
+    if not question:
+        raise groq_client.GroqError("Model returned an empty question.", 500)
+
+    return await persist_question_turn(session_id, prep, question, str(data.get("topic", "")))
 
 
 async def _evaluate_answer(session_id: str, question_turn_id: str, candidate_answer: str, agent: str) -> dict:
