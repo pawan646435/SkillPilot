@@ -5,6 +5,10 @@
 # Review the env vars and project id below, then run it yourself when ready:
 #   ./deploy.sh
 #
+# These flags are also mirrored in the Cloud Build trigger (03833d33-...).
+# If you change memory/timeout here, update the trigger too, or run this
+# script manually instead of relying on CD.
+#
 # Secrets (GROQ_API_KEY, CURRENTS_API_KEY, GNEWS_API_KEY, JSEARCH_API_KEY)
 # are intentionally NOT hardcoded here. Prefer Secret Manager (--set-secrets)
 # over --set-env-vars for these in a real deploy — see the README for both

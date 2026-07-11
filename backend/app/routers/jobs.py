@@ -137,7 +137,6 @@ async def _fetch_from_upstream(category: str) -> dict | None:
         search_query = f"{role} in India"
         params = {
             "query": search_query,
-            "page": "1",
             "num_pages": "2",
             "country": "in",
             "date_posted": "month",
@@ -160,13 +159,13 @@ async def _fetch_from_upstream(category: str) -> dict | None:
         JSEARCH_TIMEOUT = 10.0
         try:
             response = await client.get(
-                "https://jsearch.p.rapidapi.com/search", params=params, headers=headers, timeout=JSEARCH_TIMEOUT
+                "https://jsearch.p.rapidapi.com/search-v2", params=params, headers=headers, timeout=JSEARCH_TIMEOUT
             )
         except httpx.TimeoutException:
             if DEBUG:
                 print("[jobs] JSearch timed out once, retrying...")
             response = await client.get(
-                "https://jsearch.p.rapidapi.com/search", params=params, headers=headers, timeout=JSEARCH_TIMEOUT
+                "https://jsearch.p.rapidapi.com/search-v2", params=params, headers=headers, timeout=JSEARCH_TIMEOUT
             )
 
         if DEBUG:
