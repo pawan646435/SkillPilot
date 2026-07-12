@@ -26,7 +26,7 @@ export default function PublicNavbar() {
           <Link to="/" onMouseEnter={() => prefetchRoute("/")} onFocus={() => prefetchRoute("/")} className="transition-colors hover:text-white">Home</Link>
           <Link to="/news" onMouseEnter={() => prefetchRoute("/news")} onFocus={() => prefetchRoute("/news")} className="transition-colors hover:text-white">News</Link>
           <Link to="/jobs" onMouseEnter={() => prefetchRoute("/jobs")} onFocus={() => prefetchRoute("/jobs")} className="transition-colors hover:text-white">Jobs</Link>
-          <Link to="/interview" onMouseEnter={() => prefetchRoute("/interview")} onFocus={() => prefetchRoute("/interview")} className="transition-colors hover:text-white">AI Interviewer</Link>
+          <Link to="/interview/select" onMouseEnter={() => prefetchRoute("/interview/select")} onFocus={() => prefetchRoute("/interview/select")} className="transition-colors hover:text-white">AI Interviewer</Link>
         </div>
 
         {/* Right Side Actions */}

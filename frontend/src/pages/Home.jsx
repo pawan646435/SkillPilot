@@ -1,6 +1,6 @@
 // src/pages/Home.jsx
 import { motion } from "framer-motion";
-import { ArrowRight, Terminal, Cpu, Crosshair, Trophy, Code2 } from "lucide-react";
+import { ArrowRight, Terminal, Crosshair, Trophy, Code2, BrainCircuit, Users, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../context/authContextStore";
 
@@ -22,21 +22,23 @@ export default function Home() {
             <span className="absolute inline-flex w-full h-full rounded-full opacity-75 animate-ping bg-emerald-400"></span>
             <span className="relative inline-flex w-2 h-2 rounded-full bg-emerald-500"></span>
           </span>
-          SkillPilot v2.0 is now live
+          New: AI Panel Interviews — resume-grounded, multi-agent
         </motion.div>
 
-        <motion.h1 
+        <motion.h1
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.1 }}
           className="max-w-4xl mb-6 text-5xl font-bold tracking-tighter text-transparent md:text-7xl lg:text-8xl font-display bg-clip-text bg-gradient-to-b from-white to-neutral-500"
         >
           Master Algorithms.<br />Dominate the Arena.
         </motion.h1>
 
-        <motion.p 
+        <motion.p
           initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, delay: 0.2 }}
           className="max-w-2xl mb-10 text-lg leading-relaxed md:text-xl text-neutral-400"
         >
-          The ultimate platform to ace AI-driven technical interviews, climb the global ranking system, and crush your friends in real-time coding battles.
+          Practice interviews grounded in your actual resume, questioned by a Technical
+          Interviewer and Hiring Manager in real time — then climb the global ranking system
+          and crush your friends in real-time coding battles.
         </motion.p>
 
         <motion.div 
@@ -63,21 +65,47 @@ export default function Home() {
       {/* ─── BENTO FEATURES ─── */}
       <section id="features" className="px-6 py-24 mx-auto max-w-7xl">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
-          
-          {/* Feature 1 (Large) */}
-          <motion.div 
+
+          {/* Feature 1 (Large, NEW hero feature) */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}
             className="md:col-span-2 p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors relative overflow-hidden group"
           >
-            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-emerald-500/10 blur-[100px] rounded-full group-hover:bg-emerald-500/20 transition-colors" />
-            <Cpu className="w-10 h-10 mb-6 text-emerald-400" />
-            <h3 className="mb-3 text-3xl font-bold text-white font-display">AI Technical Interviewer</h3>
-            <p className="max-w-md text-lg text-neutral-400">Practice with our advanced AI that talks, listens, and evaluates your code just like a FAANG engineer.</p>
+            <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-sky-500/10 blur-[100px] rounded-full group-hover:bg-sky-500/20 transition-colors" />
+            <div className="flex items-center gap-3 mb-6">
+              <Users className="w-10 h-10 text-sky-400" />
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-sky-400/10 border border-sky-400/20 text-[10px] font-semibold uppercase tracking-wider text-sky-400">
+                <Sparkles className="w-3 h-3" /> New
+              </span>
+            </div>
+            <h3 className="mb-3 text-3xl font-bold text-white font-display">AI Panel Interview</h3>
+            <p className="max-w-md mb-6 text-lg text-neutral-400">
+              Questions grounded in your actual resume, from a Technical Interviewer and a
+              Hiring Manager — streamed back in real time, not a canned quiz.
+            </p>
+            <div className="flex items-center gap-2">
+              <span className="px-2.5 py-1 rounded-md bg-sky-400/10 border border-sky-400/20 text-xs font-semibold text-sky-400">
+                Technical Interviewer
+              </span>
+              <span className="px-2.5 py-1 rounded-md bg-violet-400/10 border border-violet-400/20 text-xs font-semibold text-violet-400">
+                Hiring Manager
+              </span>
+            </div>
           </motion.div>
 
-          {/* Feature 2 */}
-          <motion.div 
+          {/* Feature 2 (Classic, existing) */}
+          <motion.div
             initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.1 }}
+            className="p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors relative overflow-hidden"
+          >
+            <BrainCircuit className="w-10 h-10 mb-6 text-emerald-400" />
+            <h3 className="mb-3 text-2xl font-bold text-white font-display">Classic AI Interviewer</h3>
+            <p className="text-neutral-400">Pick a role and difficulty, get instant feedback after every answer.</p>
+          </motion.div>
+
+          {/* Feature 3 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
             className="p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors relative overflow-hidden"
           >
             <Crosshair className="w-10 h-10 mb-6 text-rose-400" />
@@ -85,9 +113,9 @@ export default function Home() {
             <p className="text-neutral-400">Battle friends or random opponents in real-time. First to compile passing tests wins.</p>
           </motion.div>
 
-          {/* Feature 3 */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.2 }}
+          {/* Feature 4 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
             className="p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors relative overflow-hidden"
           >
             <Trophy className="w-10 h-10 mb-6 text-amber-400" />
@@ -95,15 +123,14 @@ export default function Home() {
             <p className="text-neutral-400">Climb the ranks from Bronze to Grandmaster by dominating the Arena.</p>
           </motion.div>
 
-          {/* Feature 4 (Large) */}
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.3 }}
-            className="md:col-span-2 p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors relative overflow-hidden group"
+          {/* Feature 5 */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: 0.4 }}
+            className="p-8 rounded-3xl bg-white/[0.02] border border-white/5 hover:bg-white/[0.04] transition-colors relative overflow-hidden"
           >
-            <div className="absolute bottom-0 right-0 w-[400px] h-[400px] bg-blue-500/10 blur-[100px] rounded-full group-hover:bg-blue-500/20 transition-colors" />
             <Code2 className="w-10 h-10 mb-6 text-blue-400" />
-            <h3 className="mb-3 text-3xl font-bold text-white font-display">40+ Languages Supported</h3>
-            <p className="max-w-md text-lg text-neutral-400">Blazing fast, zero-latency execution directly in your browser. Python, Rust, C++, JS, and more.</p>
+            <h3 className="mb-3 text-2xl font-bold text-white font-display">40+ Languages</h3>
+            <p className="text-neutral-400">Blazing fast, zero-latency execution. Python, Rust, C++, JS, and more.</p>
           </motion.div>
 
         </div>

@@ -6,8 +6,11 @@ import { postJson } from "./ragService";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-export async function startPanel(sessionId) {
-  return postJson("/panel/start", { session_id: sessionId ?? null });
+export async function startPanel(sessionId, experienceLevel) {
+  return postJson("/panel/start", {
+    session_id: sessionId ?? null,
+    experience_level: experienceLevel ?? null,
+  });
 }
 
 export async function nextTurn(sessionId) {

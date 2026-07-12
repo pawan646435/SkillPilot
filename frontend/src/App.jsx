@@ -50,10 +50,16 @@ const InviteVerify = lazy(() => import("./pages/InviteVerify"));
 const TakeAssessment = lazy(() => import("./pages/TakeAssessment"));
 const Clash = lazy(() => import("./pages/Clash"));
 
-// AI Interview Pages
+// AI Interview Pages -- Classic flow, unchanged
 const InterviewSetup = lazy(() => import("./pages/InterviewSetup"));
 const InterviewRoom = lazy(() => import("./pages/InterviewRoom"));
 const InterviewReport = lazy(() => import("./pages/InterviewReport"));
+
+// AI Interview Pages -- mode selection + AI Panel flow (new)
+const ModeSelect = lazy(() => import("./pages/ModeSelect"));
+const PanelSetup = lazy(() => import("./pages/PanelSetup"));
+const PanelRoom = lazy(() => import("./pages/PanelRoom"));
+const PanelReport = lazy(() => import("./pages/PanelReport"));
 
 // Dev-only test page (not linked from any nav, DEV-build only -- see route below)
 const PanelTest = import.meta.env.DEV ? lazy(() => import("./pages/dev/PanelTest")) : null;
@@ -82,6 +88,8 @@ function App() {
               <Route path="/news" element={<News />} />
               <Route path="/jobs" element={<Jobs />} />
               <Route path="/interview" element={<InterviewSetup />} />
+              <Route path="/interview/select" element={<ModeSelect />} />
+              <Route path="/interview/panel" element={<PanelSetup />} />
             </Route>
 
             {/* THE HACKER TERMINAL THEME */}
@@ -92,9 +100,13 @@ function App() {
             <Route path="/assessment/take/:id" element={<TakeAssessment />} />
             <Route path="/clash" element={<Clash />} />
 
-            {/* AI INTERVIEW - Full screen for room & report */}
+            {/* AI INTERVIEW - Full screen for room & report (Classic, unchanged) */}
             <Route path="/interview/room" element={<InterviewRoom />} />
             <Route path="/interview/report" element={<InterviewReport />} />
+
+            {/* AI PANEL INTERVIEW - full screen for room & report */}
+            <Route path="/interview/panel/room" element={<PanelRoom />} />
+            <Route path="/interview/panel/report" element={<PanelReport />} />
 
             {/* DEV-ONLY TEST PAGE (import.meta.env.DEV only, stripped from production builds) */}
             {import.meta.env.DEV && <Route path="/dev/panel-test" element={<PanelTest />} />}

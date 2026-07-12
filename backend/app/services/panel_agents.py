@@ -63,15 +63,39 @@ _RETRIEVAL_TOP_K = 2
 # "technical projects/technologies" 0.2456 -> 0.2839 as a question) because
 # the model was trained on sentence-to-sentence similarity, and resume prose
 # is closer to a question's shape than to a keyword list's.
-AGENT_RETRIEVAL_QUERIES: dict[str, list[str]] = {
-    "technical": [
-        "What distributed systems, architecture, and system design work has this person done?",
-        "What programming languages, databases, and technologies has this person worked with?",
-    ],
-    "hiring_manager": [
-        "Does this candidate have experience leading, mentoring, or managing a team?",
-        "Has this person handled disagreement, conflict, or difficult situations with colleagues?",
-    ],
+#
+# Nested by experience level (added alongside experience-level support):
+# querying a fresher's resume for "system design at scale" or "leading a
+# team" would almost always come back empty -- not because retrieval is
+# broken, but because a fresher's resume was never going to contain that
+# content. That's a query/resume-shape mismatch, not a grounding-quality
+# problem, so it gets its own query set rather than leaning on the Stage 2
+# fallback to paper over it. MIN_TOP_SIMILARITY and the fallback decision
+# itself are completely unaffected by experience level -- only which text
+# we search for changes.
+DEFAULT_EXPERIENCE_LEVEL = "experienced"
+
+AGENT_RETRIEVAL_QUERIES: dict[str, dict[str, list[str]]] = {
+    "fresher": {
+        "technical": [
+            "What academic projects, coursework, or internship work has this person done?",
+            "What programming languages, tools, or technologies has this person used in projects or coursework?",
+        ],
+        "hiring_manager": [
+            "Has this person collaborated on group projects, class assignments, or team-based coursework?",
+            "Has this person received mentorship, feedback, or guidance from teachers, mentors, or senior colleagues?",
+        ],
+    },
+    "experienced": {
+        "technical": [
+            "What distributed systems, architecture, and system design work has this person done?",
+            "What programming languages, databases, and technologies has this person worked with?",
+        ],
+        "hiring_manager": [
+            "Does this candidate have experience leading, mentoring, or managing a team?",
+            "Has this person handled disagreement, conflict, or difficult situations with colleagues?",
+        ],
+    },
 }
 
 _PERSONA_SYSTEM_PROMPTS = {
@@ -95,6 +119,49 @@ _PERSONA_SYSTEM_PROMPTS = {
         "hiring recommendation."
     ),
 }
+
+# Appended to a persona's base system prompt (never replaces it) to calibrate
+# question STYLE/DEPTH to the candidate's stated experience level. panel_lead
+# has no entry here on purpose -- synthesis reads the transcript the leveled
+# personas already produced, it doesn't need its own level adjustment.
+_EXPERIENCE_LEVEL_GUIDANCE: dict[str, dict[str, str]] = {
+    "fresher": {
+        "technical": (
+            "This candidate is early-career (fresher/new-grad level). Focus on "
+            "fundamentals, problem-solving reasoning, and whether they understand WHY "
+            "their approach works — not production-scale tradeoffs or system design at "
+            "scale. Meet them at their level; don't penalize a lack of enterprise "
+            "experience they haven't had the chance to gain yet."
+        ),
+        "hiring_manager": (
+            "This candidate is early-career. Ask about how they handled a learning "
+            "curve, worked with mentors/teammates, or figured something out with "
+            "limited guidance — not formal leadership or cross-team ownership stories "
+            "they likely haven't had the opportunity for yet."
+        ),
+    },
+    "experienced": {
+        "technical": (
+            "This candidate has professional experience — probe tradeoffs, scale, "
+            "failure modes, and ownership of real production decisions. Expect them "
+            "to justify choices with concrete outcomes, not textbook definitions."
+        ),
+        "hiring_manager": (
+            "This candidate has professional experience — probe how they've led, "
+            "mentored, or resolved conflict as an owner of outcomes, not just a "
+            "participant. Expect concrete examples of influencing decisions or "
+            "people, not hypotheticals."
+        ),
+    },
+}
+
+
+def _persona_system_prompt(agent: str, experience_level: str) -> str:
+    """The persona's base identity, plus its experience-level calibration
+    clause when one exists for this agent (panel_lead never has one)."""
+    base = _PERSONA_SYSTEM_PROMPTS[agent]
+    guidance = _EXPERIENCE_LEVEL_GUIDANCE.get(experience_level, {}).get(agent)
+    return f"{base} {guidance}" if guidance else base
 
 
 def _question_user_prompt(agent: str, context_block: str, previous_questions: list[str]) -> str:
@@ -197,7 +264,10 @@ async def prepare_question_turn(session_id: str, agent: str, turn_number: int) -
     in Stage 3 so the streaming endpoint runs the identical retrieval/
     fallback logic without duplicating it — same inputs in, same grounding
     decisions out, regardless of how the completion is then fetched."""
-    queries = AGENT_RETRIEVAL_QUERIES[agent]
+    session_doc = await async_get(get_db().collection("interviewSessions").document(session_id))
+    experience_level = session_doc.to_dict().get("experienceLevel", DEFAULT_EXPERIENCE_LEVEL) if session_doc.exists else DEFAULT_EXPERIENCE_LEVEL
+
+    queries = AGENT_RETRIEVAL_QUERIES[experience_level][agent]
     query = queries[(turn_number - 1) % len(queries)]
 
     retrieved = await retrieve_relevant_chunks(session_id, query, top_k=_RETRIEVAL_TOP_K)
@@ -205,6 +275,7 @@ async def prepare_question_turn(session_id: str, agent: str, turn_number: int) -
     # Task 3 (Stage 2): trust retrieval only if its single best match clears
     # the noise floor. Chunks below the threshold are dropped even when the
     # top passes, so a strong #1 never drags an unrelated #2 into the prompt.
+    # Unaffected by experience_level -- only the query text above changes.
     used_fallback = not retrieved or retrieved[0]["similarity"] < MIN_TOP_SIMILARITY
     chunks = [] if used_fallback else [c for c in retrieved if c["similarity"] >= MIN_TOP_SIMILARITY]
 
@@ -215,6 +286,7 @@ async def prepare_question_turn(session_id: str, agent: str, turn_number: int) -
 
     return {
         "agent": agent,
+        "experience_level": experience_level,
         "query": query,
         "retrieved": retrieved,
         "chunks": chunks,
@@ -243,6 +315,11 @@ async def persist_question_turn(session_id: str, prep: dict, question: str, topi
         "usedFallback": prep["used_fallback"],
         "retrievalQuery": prep["query"],
         "topSimilarity": retrieved[0]["similarity"] if retrieved else None,
+        # Tagged the same way promptVersion is, so the level actually used to
+        # generate this question is inspectable later (and usable as a Stage
+        # 4 golden-set dimension) without having to re-derive it from the
+        # session doc, which could change after this turn was written.
+        "experienceLevel": prep["experience_level"],
     })
 
     return {
@@ -266,7 +343,7 @@ async def persist_question_turn(session_id: str, prep: dict, question: str, topi
 def question_messages(prep: dict) -> list[dict]:
     """Prompt messages for the buffered (JSON-mode) question call."""
     return [
-        {"role": "system", "content": _PERSONA_SYSTEM_PROMPTS[prep["agent"]]},
+        {"role": "system", "content": _persona_system_prompt(prep["agent"], prep["experience_level"])},
         {"role": "user", "content": _question_user_prompt(
             prep["agent"], _context_block(prep["chunks"]), prep["previous_questions"])},
     ]
@@ -285,7 +362,7 @@ def question_messages_plain(prep: dict) -> list[dict]:
     plain = base.split("You MUST respond ONLY with")[0].rstrip()
     plain += "\n\nRespond with ONLY the question text itself — no JSON, no preamble, no quotes."
     return [
-        {"role": "system", "content": _PERSONA_SYSTEM_PROMPTS[prep["agent"]]},
+        {"role": "system", "content": _persona_system_prompt(prep["agent"], prep["experience_level"])},
         {"role": "user", "content": plain},
     ]
 

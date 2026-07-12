@@ -20,6 +20,7 @@ The old single-agent flow in routers/interview.py is untouched; this is a
 new, additive surface.
 """
 import json
+from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
@@ -49,6 +50,7 @@ _EVALUATE = {
 
 class StartRequest(BaseModel):
     session_id: str | None = None
+    experience_level: Literal["fresher", "experienced"] | None = None
 
 
 class NextTurnRequest(BaseModel):
@@ -76,7 +78,12 @@ async def start_panel(body: StartRequest, user: DecodedUser = Depends(require_au
     """Marks a session as an active panel interview. Reuses a session that
     /rag/ingest already populated with resume chunks when session_id is
     passed; otherwise creates a fresh (context-less) session, in which every
-    question turn will take the Task 3 generic-fallback path."""
+    question turn will take the Task 3 generic-fallback path.
+
+    experience_level is set once here and read back by panel_agents.py's
+    prepare_question_turn on every subsequent question turn -- resuming an
+    already-PANEL_ACTIVE session (the early return below) intentionally
+    does NOT let a later call change it mid-interview."""
     db = get_db()
 
     if body.session_id:
@@ -91,10 +98,16 @@ async def start_panel(body: StartRequest, user: DecodedUser = Depends(require_au
         "status": "PANEL_ACTIVE",
         "panelPlan": _QUESTION_PLAN,
         "promptVersion": panel_agents.PROMPT_VERSION,
+        "experienceLevel": body.experience_level or panel_agents.DEFAULT_EXPERIENCE_LEVEL,
         "updatedAt": firestore.SERVER_TIMESTAMP,
     }, merge=True)
 
-    return {"session_id": session_ref.id, "status": "PANEL_ACTIVE", "resumed": False}
+    return {
+        "session_id": session_ref.id,
+        "status": "PANEL_ACTIVE",
+        "resumed": False,
+        "experience_level": body.experience_level or panel_agents.DEFAULT_EXPERIENCE_LEVEL,
+    }
 
 
 async def _derive_position(session_id: str) -> dict:
@@ -213,7 +226,15 @@ async def next_turn_stream(body: NextTurnRequest, user: DecodedUser = Depends(re
 
             if position["kind"] == "synthesis":
                 result = await panel_agents.synthesize_final_report(body.session_id)
-                yield _sse({"type": "action", "action": "synthesis", **result})
+                # result's own "type" key ("synthesis", from synthesize_final_report's
+                # turn-shaped return) must NOT win here -- the SSE envelope's "type"
+                # has a different vocabulary (meta/delta/done/action/error) that
+                # nextTurnStream() dispatches on. Spreading **result first, then
+                # setting type/action explicitly after, prevents the dict-literal
+                # collision that silently produced type="synthesis" instead of
+                # type="action" here (found via a real end-to-end panel run that
+                # completed all 4 turns but then hung waiting for a terminal event).
+                yield _sse({**result, "type": "action", "action": "synthesis"})
                 return
 
             # The streaming case: prepare (identical retrieval + threshold
