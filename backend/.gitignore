@@ -9,3 +9,7 @@ __pycache__/
 *service-account*.json
 *credentials*.json
 *.pem
+
+# Raw per-run eval output (backend/scripts/run_evals.py) -- local evidence
+# from a specific run, not a version-controlled fixture like golden_set.json.
+evals/results/

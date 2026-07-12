@@ -1,0 +1,111 @@
+{
+  "description": "Stage 4 golden set for the AI Interview Panel eval harness. Fixed, version-controlled test cases — NOT live session data. Each case supplies a resume (ingested into a fresh, throwaway session the same way /rag/ingest would) plus which agent/turn to generate a question for, and what the deterministic parts of panel_agents.py should do given that input.",
+  "cases": [
+    {
+      "id": "technical_distributed_systems",
+      "persona_under_test": "technical",
+      "agent": "technical",
+      "turn_number": 1,
+      "resume_text": "Senior Backend Engineer with 6 years building distributed systems. Designed and operated a Kafka-based event pipeline processing 40k messages/second across 12 microservices, replacing a monolithic cron-batch system that could not meet the new 5-minute data-freshness SLA. Led the migration from a single PostgreSQL instance to a sharded, read-replica topology after write contention started causing checkout latency spikes above 800ms at peak traffic; post-migration p99 latency dropped to 140ms. Built the internal service mesh's retry and circuit-breaker layer in Go after a cascading failure in one payment-adjacent service took down three unrelated services for 40 minutes. Comfortable reasoning about CAP-theorem tradeoffs, idempotency keys for at-least-once delivery, and backpressure under load.",
+      "expect": {
+        "used_fallback": false,
+        "grounding_keywords": ["kafka", "postgresql", "microservices", "latency", "circuit-breaker", "sharded"]
+      },
+      "mechanically_checkable": [
+        "retrieve_relevant_chunks() returns at least one chunk for this session",
+        "top similarity score is a float >= MIN_TOP_SIMILARITY (0.15), so used_fallback is False",
+        "the generated question is non-empty and a reasonable length (roughly 10-400 chars)",
+        "the question text contains at least one of grounding_keywords (case-insensitive) -- an approximate, mechanical proxy for 'did it actually reference this resume', not proof the question is well-phrased"
+      ],
+      "not_mechanically_checkable": [
+        "whether the question is a genuinely good, well-posed technical question a real interviewer would ask",
+        "whether probing the specific detail it picked is the *most* interesting angle available in the resume"
+      ]
+    },
+    {
+      "id": "technical_ml_pipeline",
+      "persona_under_test": "technical",
+      "agent": "technical",
+      "turn_number": 2,
+      "resume_text": "Machine Learning Engineer focused on production model-serving infrastructure. Built a feature store on top of Redis and a nightly Spark batch job so online (low-latency) and offline (training-time) feature computation stayed consistent, after a training/serving skew bug silently degraded a fraud model's precision by 9 points for three weeks before anyone noticed. Migrated model serving from a synchronous Flask endpoint to a batched Triton Inference Server deployment, cutting P95 inference latency from 220ms to 35ms under the same load. Uses PyTorch for model development and DVC for dataset/model versioning so any production prediction can be traced back to the exact training run that produced it. Comfortable with quantization tradeoffs and canary-rollout strategy for new model versions.",
+      "expect": {
+        "used_fallback": false,
+        "grounding_keywords": ["pytorch", "triton", "feature store", "dvc", "redis", "spark", "quantization"]
+      },
+      "mechanically_checkable": [
+        "retrieve_relevant_chunks() returns at least one chunk for this session",
+        "top similarity score clears MIN_TOP_SIMILARITY, so used_fallback is False",
+        "turn_number=2 selects AGENT_RETRIEVAL_QUERIES['technical'][1] (the 'languages/databases/technologies' query), not the same query as turn 1 -- this case exercises query cycling with a resume that has zero overlap with the distributed-systems case",
+        "question is non-empty, reasonable length",
+        "question contains at least one grounding_keyword"
+      ],
+      "not_mechanically_checkable": [
+        "whether the question is genuinely good",
+        "whether it picked the most interesting ML-specific detail over a less interesting one"
+      ]
+    },
+    {
+      "id": "technical_fullstack_mobile",
+      "persona_under_test": "technical",
+      "agent": "technical",
+      "turn_number": 1,
+      "resume_text": "Full-stack mobile engineer shipping both the React Native client and its GraphQL backend for a consumer app with 200k monthly active users. Rebuilt the app's offline-sync layer using a local SQLite cache and optimistic UI updates after users on flaky connections were losing form submissions silently; conflict resolution uses last-write-wins with a manual merge prompt for genuinely conflicting edits. Owns the CI/CD pipeline (Fastlane + GitHub Actions) that builds and signs both the iOS and Android releases, cutting release day from a 3-hour manual process to a 20-minute automated one. Wrote the GraphQL schema's pagination layer (cursor-based, not offset) after offset pagination produced duplicate/skipped rows under concurrent writes.",
+      "expect": {
+        "used_fallback": false,
+        "grounding_keywords": ["react native", "graphql", "sqlite", "ios", "android", "ci/cd", "fastlane", "pagination", "last-write-wins", "conflict resolution", "offline-sync", "offline sync"]
+      },
+      "mechanically_checkable": [
+        "retrieve_relevant_chunks() returns at least one chunk",
+        "top similarity clears MIN_TOP_SIMILARITY, used_fallback is False",
+        "third resume with zero content overlap against the first two -- this is the 'varying resume content, not just one scenario' requirement",
+        "question non-empty, reasonable length, contains a grounding_keyword"
+      ],
+      "not_mechanically_checkable": [
+        "whether the question is genuinely good",
+        "phrasing quality/specificity beyond keyword presence"
+      ]
+    },
+    {
+      "id": "hiring_manager_leadership",
+      "persona_under_test": "hiring_manager",
+      "agent": "hiring_manager",
+      "turn_number": 1,
+      "resume_text": "Engineering Manager leading a team of 8 backend and mobile engineers across two product lines. Grew the team from 3 to 8 over 18 months, building the interview loop and onboarding plan from scratch. Mentored two senior engineers into their first tech-lead roles, running weekly 1:1s focused on concrete growth plans rather than status updates. Navigated a sustained disagreement between two senior ICs over a service-ownership boundary by running a structured design review with an explicit decision-owner, rather than letting the debate stall the roadmap for another quarter. Owns quarterly planning and stakeholder communication with Product and Design, including delivering hard news (a slipped launch date) directly and early rather than letting it surface in a status meeting.",
+      "expect": {
+        "used_fallback": false,
+        "grounding_keywords": ["mentor", "team of 8", "1:1", "disagreement", "stakeholder", "tech-lead", "onboarding"]
+      },
+      "mechanically_checkable": [
+        "retrieve_relevant_chunks() returns at least one chunk using the hiring_manager persona's OWN queries (leadership/conflict), not the technical persona's queries -- confirms Stage 2's per-agent query design actually produces different retrieval for the same session type",
+        "top similarity clears MIN_TOP_SIMILARITY, used_fallback is False",
+        "question non-empty, reasonable length, contains a grounding_keyword",
+        "question is phrased as a behavioral prompt, not a technical one (soft heuristic: doesn't ask about a specific technology)"
+      ],
+      "not_mechanically_checkable": [
+        "whether the behavioral question is genuinely incisive",
+        "whether it surfaces the most revealing leadership moment in the resume vs. a less interesting one"
+      ]
+    },
+    {
+      "id": "fallback_offtopic_resume",
+      "persona_under_test": "technical",
+      "agent": "technical",
+      "turn_number": 1,
+      "resume_text": "Weekend baking journal, March through September. Started with a basic sourdough starter fed daily with equal parts flour and water. Learned that overproofing in a warm kitchen produces a gummy crumb, and that a longer cold retard in the fridge overnight gives a much more open, blistered crust. Moved on to laminated doughs -- croissants took four attempts before the butter stopped leaking out during the bake, which turned out to be a lamination-temperature problem, not a folding-technique problem. Also kept notes on sourdough discard recipes (crackers, pancakes) to avoid wasting the daily feed discard. No professional kitchen experience; this is a home hobby documented for personal reference.",
+      "expect": {
+        "used_fallback": true,
+        "grounding_keywords": []
+      },
+      "mechanically_checkable": [
+        "retrieve_relevant_chunks() still runs and returns candidate chunks (retrieval never errors just because content is off-topic)",
+        "top similarity score is BELOW MIN_TOP_SIMILARITY (0.15) -- this resume has zero engineering or leadership content, so every chunk should score in the same noise-floor range Stage 2's own tuning run found (-0.10 to 0.12 against an off-topic control)",
+        "used_fallback is True, chunks list is empty, and the prompt sent to the LLM is the generic fallback instruction, not any resume excerpt",
+        "the generated question is still non-empty and reasonable length -- a fallback must still produce SOME question, just an ungrounded one"
+      ],
+      "not_mechanically_checkable": [
+        "whether the model actually honored 'do NOT pretend to reference their resume' rather than hallucinating a fake connection to baking -- this requires reading the actual output text, which the runner logs in full for manual read",
+        "whether the generic question is itself good"
+      ]
+    }
+  ]
+}

@@ -101,5 +101,17 @@ service cloud.firestore {
     match /submissions/{submissionId} {
       allow read, write: if isSignedIn();
     }
+
+    // Eval harness run records (AI Interview Panel, Stage 4). Only the
+    // backend's admin-SDK client (via backend/scripts/run_evals.py) ever
+    // writes these, same trust model as interviewSessions/turns above.
+    // Unlike a user's own interview data, this is internal engineering
+    // telemetry (which prompt version passed which golden-set case) with
+    // no owning user at all, so it's admin-only to read, not
+    // per-uid-owner -- no end user has a legitimate reason to see it.
+    match /evalRuns/{runId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
   }
 }
