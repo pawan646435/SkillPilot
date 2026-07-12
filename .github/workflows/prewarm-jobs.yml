@@ -30,4 +30,20 @@ jobs:
             exit 1
           fi
 
-          echo "Prewarm request succeeded with HTTP $http_code"
+          echo "Prewarm request succeeded with HTTP $http_code -- checking each category's result..."
+
+          # A 200 here only means the endpoint ran, not that every category's
+          # upstream JSearch fetch succeeded (see PrewarmResponse in jobs.py --
+          # each category reports its own success/error independently). Parse
+          # the body and fail loudly if any category came back success:false,
+          # so an upstream problem (quota exhaustion, endpoint changes, etc.)
+          # shows up as a red X here instead of hiding behind an HTTP 200.
+          failed_categories=$(jq -r '.results[] | select(.success == false) | "\(.category): \(.error)"' /tmp/response.json)
+
+          if [ -n "$failed_categories" ]; then
+            echo "The following categories failed to prewarm:"
+            echo "$failed_categories"
+            exit 1
+          fi
+
+          echo "All categories prewarmed successfully."

@@ -143,7 +143,6 @@ export default function News() {
   const [articles, setArticles] = useState([]);
   const [savedArticles, setSavedArticles] = useState({});
   const [viewMode, setViewMode] = useState("feed");
-  const [selectedInterests, setSelectedInterests] = useState(["ai", "webdev"]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [activeCategory, setActiveCategory] = useState(CATEGORIES[0]);
@@ -164,7 +163,7 @@ export default function News() {
 
   useEffect(() => {
     const saved = localStorage.getItem(`${storagePrefix}-bookmarks`);
-    const interests = localStorage.getItem(`${storagePrefix}-interests`);
+    const savedCategoryId = localStorage.getItem(`${storagePrefix}-category`);
 
     if (saved) {
       try {
@@ -176,15 +175,9 @@ export default function News() {
       setSavedArticles({});
     }
 
-    if (interests) {
-      try {
-        const parsed = JSON.parse(interests);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          setSelectedInterests(parsed);
-        }
-      } catch {
-        setSelectedInterests(["ai", "webdev"]);
-      }
+    if (savedCategoryId) {
+      const match = CATEGORIES.find((cat) => cat.id === savedCategoryId);
+      if (match) setActiveCategory(match);
     }
   }, [storagePrefix]);
 
@@ -193,8 +186,8 @@ export default function News() {
   }, [savedArticles, storagePrefix]);
 
   useEffect(() => {
-    localStorage.setItem(`${storagePrefix}-interests`, JSON.stringify(selectedInterests));
-  }, [selectedInterests, storagePrefix]);
+    localStorage.setItem(`${storagePrefix}-category`, activeCategory.id);
+  }, [activeCategory, storagePrefix]);
 
   const fetchNews = useCallback(async (cat, query, pageNum, append = false) => {
     if (!append) setLoading(true);
@@ -255,38 +248,9 @@ export default function News() {
     });
   };
 
-  const toggleInterest = (interestId) => {
-    setSelectedInterests((prev) => {
-      if (prev.includes(interestId)) {
-        if (prev.length === 1) return prev;
-        return prev.filter((id) => id !== interestId);
-      }
-      return [...prev, interestId];
-    });
-  };
-
-  const rankedArticles = useMemo(() => {
-    if (searchQuery || activeCategory.id !== "technology") {
-      return articles;
-    }
-
-    return [...articles].sort((a, b) => {
-      const score = (article) => {
-        const text = `${article.title || ""} ${article.description || ""}`.toLowerCase();
-        return selectedInterests.reduce((sum, interestId) => {
-          const keywords = INTEREST_KEYWORDS[interestId] || [];
-          const matches = keywords.filter((keyword) => text.includes(keyword)).length;
-          return sum + matches;
-        }, 0);
-      };
-
-      return score(b) - score(a);
-    });
-  }, [articles, selectedInterests, searchQuery, activeCategory.id]);
-
   const displayedArticles = viewMode === "saved"
     ? Object.values(savedArticles).sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0))
-    : rankedArticles;
+    : articles;
 
   const dailyBrief = useMemo(() => {
     const localKey = `${storagePrefix}-daily-brief-${new Date().toISOString().slice(0, 10)}`;
@@ -300,10 +264,10 @@ export default function News() {
       }
     }
 
-    const brief = getDailyBrief(rankedArticles);
+    const brief = getDailyBrief(articles);
     localStorage.setItem(localKey, JSON.stringify(brief));
     return brief;
-  }, [rankedArticles, storagePrefix]);
+  }, [articles, storagePrefix]);
 
   if (!authReady || !user) {
     return (
@@ -416,28 +380,6 @@ export default function News() {
           </button>
         ))}
       </div>
-
-      {/* Personalization */}
-      {viewMode === "feed" && (
-        <div className="p-4 rounded-2xl border border-white/10 bg-white/[0.02]">
-          <p className="mb-3 font-mono text-xs text-neutral-500">Personalize your feed</p>
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.filter((cat) => cat.id !== "technology").map((cat) => (
-              <button
-                key={cat.id}
-                onClick={() => toggleInterest(cat.id)}
-                className={`px-3 py-1.5 rounded-lg border text-xs font-medium transition-colors ${
-                  selectedInterests.includes(cat.id)
-                    ? "text-emerald-300 border-emerald-400/30 bg-emerald-400/10"
-                    : "text-neutral-500 border-white/10 bg-white/[0.02] hover:text-white"
-                }`}
-              >
-                {cat.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
 
       {/* Error State */}
       <AnimatePresence>
