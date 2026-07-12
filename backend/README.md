@@ -20,7 +20,7 @@ explanation of why this migration happened and how the pieces fit together.
 backend/
 ├── app/
 │   ├── main.py                  → FastAPI app, CORS, router registration
-│   ├── config.py                → region/CORS/env var loading
+│   ├── config.py                → CORS/env var loading
 │   ├── dependencies/
 │   │   └── auth.py              → Firebase ID token verification dependency
 │   ├── routers/
@@ -28,17 +28,31 @@ backend/
 │   │   ├── clash.py             → Code Clash run/submit/finalize/generate/join
 │   │   ├── assessments.py       → assessment submit (run/submit modes)
 │   │   ├── jobs.py              → JSearch proxy
-│   │   └── news.py              → GNews proxy
+│   │   ├── news.py              → Currents API news proxy
+│   │   ├── rag.py               → RAG context ingestion (AI Interview Panel, Stage 1)
+│   │   └── panel.py             → multi-agent interview panel + streaming (Stages 2-3)
 │   └── services/
 │       ├── judge.py             → sandboxed multi-language code judge
-│       ├── groq_client.py       → Groq chat-completions wrapper
-│       └── firestore_client.py  → firebase-admin init, shared Firestore client
+│       ├── groq_client.py       → Groq chat-completions wrapper (buffered + streaming)
+│       ├── firestore_client.py  → firebase-admin init, shared Firestore client
+│       ├── http_client.py       → shared httpx.AsyncClient (app-lifespan managed)
+│       ├── chunking.py          → resume/JD text chunking (Stage 1)
+│       ├── embeddings.py        → sentence-transformers embedding generation (Stage 1)
+│       ├── retrieval.py         → cosine-similarity chunk retrieval (Stage 1)
+│       └── panel_agents.py      → technical/hiring_manager/panel_lead personas (Stage 2)
+├── evals/
+│   └── golden_set.json          → fixed eval test cases (Stage 4)
+├── scripts/
+│   └── run_evals.py             → eval harness runner (Stage 4)
 ├── requirements.txt
 ├── Dockerfile
 ├── deploy.sh                    → documented `gcloud run deploy` (not run automatically)
 ├── .env.example
 └── .dockerignore
 ```
+
+See `docs/stage1-rag-ingestion-explained.md` through `docs/stage4-eval-harness-explained.md`
+at the repo root for the full walkthrough of the RAG/panel/streaming/eval-harness pieces above.
 
 ## Running locally
 
@@ -55,7 +69,7 @@ pip install -r requirements.txt
 
 ```bash
 cp .env.example .env
-# fill in GROQ_API_KEY, GNEWS_API_KEY, JSEARCH_API_KEY
+# fill in GROQ_API_KEY, CURRENTS_API_KEY, JSEARCH_API_KEY, PREWARM_SECRET
 ```
 
 For Firestore/Auth access locally, you need Application Default Credentials
@@ -129,11 +143,11 @@ gcloud run deploy skillpilot-api \
   --allow-unauthenticated \
   --min-instances=0 \
   --max-instances=3 \
-  --memory=512Mi \
+  --memory=1Gi \
   --cpu=1 \
-  --timeout=30s \
+  --timeout=120s \
   --set-env-vars="FIREBASE_PROJECT_ID=myproject-a48d7,DEBUG=false" \
-  --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,GNEWS_API_KEY=GNEWS_API_KEY:latest,JSEARCH_API_KEY=JSEARCH_API_KEY:latest"
+  --set-secrets="GROQ_API_KEY=GROQ_API_KEY:latest,CURRENTS_API_KEY=CURRENTS_API_KEY:latest,JSEARCH_API_KEY=JSEARCH_API_KEY:latest,PREWARM_SECRET=PREWARM_SECRET:latest"
 ```
 
 Notes:
@@ -146,12 +160,13 @@ Notes:
   charges while nobody's using it, at the cost of a cold start on the next
   request (a few hundred ms to a couple seconds, depending on whether it's a
   warm container reuse or a fresh one).
-- `--set-secrets` assumes the three secrets already exist in Secret Manager.
+- `--set-secrets` assumes the four secrets already exist in Secret Manager.
   Create them once with:
   ```bash
   echo -n "your-groq-key" | gcloud secrets create GROQ_API_KEY --data-file=- --project myproject-a48d7
-  echo -n "your-gnews-key" | gcloud secrets create GNEWS_API_KEY --data-file=- --project myproject-a48d7
+  echo -n "your-currents-key" | gcloud secrets create CURRENTS_API_KEY --data-file=- --project myproject-a48d7
   echo -n "your-jsearch-key" | gcloud secrets create JSEARCH_API_KEY --data-file=- --project myproject-a48d7
+  echo -n "your-prewarm-secret" | gcloud secrets create PREWARM_SECRET --data-file=- --project myproject-a48d7
   ```
 - After deploying, update `frontend/.env` (or your Vercel project's env
   vars) with the deployed URL:

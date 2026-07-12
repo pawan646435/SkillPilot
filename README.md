@@ -31,7 +31,7 @@ cd backend
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # fill in GROQ_API_KEY, GNEWS_API_KEY, JSEARCH_API_KEY
+cp .env.example .env   # fill in GROQ_API_KEY, CURRENTS_API_KEY, JSEARCH_API_KEY, PREWARM_SECRET
 uvicorn app.main:app --reload --port 8000
 ```
 
@@ -49,4 +49,4 @@ Full setup details (Firestore/Auth credentials, emulator suite, language runtime
 
 ## Docs
 
-See [docs/](docs/) for deeper explanations, including the writeup on why the backend migrated from Firebase Cloud Functions to a standalone FastAPI service on Cloud Run.
+See [docs/](docs/) for deeper explanations: why the backend migrated from Firebase Cloud Functions to a standalone FastAPI service on Cloud Run (`backend-migration-explained.md`), and the 4-stage AI Interview Panel build — RAG ingestion (`stage1-rag-ingestion-explained.md`), the multi-agent panel (`stage2-multi-agent-panel-explained.md`), streaming responses (`stage3-streaming-explained.md`), and the eval harness (`stage4-eval-harness-explained.md`).

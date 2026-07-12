@@ -56,17 +56,6 @@ export async function getNewsFromProxy(category, query, pageNum = 1) {
   }
 }
 
-// Generic passthrough for the full Groq response envelope. Not currently
-// called by any page — kept only so this export's signature keeps working
-// for any future/external caller, backed by POST /interview/raw-chat.
-export async function generateGroqResponse(messages) {
-  try {
-    return await postJson("/interview/raw-chat", { messages }, "AI proxy request failed.");
-  } catch (error) {
-    throw new Error(getErrorMessage(error, "AI proxy request failed."));
-  }
-}
-
 export async function generateInterviewQuestion(role, difficulty, previousQA = [], questionType = "subjective") {
   try {
     return await postJson(

@@ -1,5 +1,4 @@
-import { auth, db } from "../lib/firebase";
-import { collection, getDocs, orderBy, query } from "firebase/firestore";
+import { auth } from "../lib/firebase";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -25,22 +24,4 @@ export async function postJson(path, payload) {
   }
 
   return data;
-}
-
-export async function ingestInterviewContext(rawText, sourceType, sessionId) {
-  return postJson("/rag/ingest", {
-    session_id: sessionId ?? null,
-    raw_text: rawText,
-    source_type: sourceType,
-  });
-}
-
-// Reads chunks directly via the Firestore client SDK (not the backend) —
-// contextChunks read rules (firestore.rules) allow this for the owning uid.
-// Dev-test-page use only; production retrieval goes through the backend's
-// services/retrieval.py, not this direct client read.
-export async function fetchSessionChunks(sessionId) {
-  const chunksRef = collection(db, "interviewSessions", sessionId, "contextChunks");
-  const snap = await getDocs(query(chunksRef, orderBy("order")));
-  return snap.docs.map((docSnap) => ({ id: docSnap.id, ...docSnap.data() }));
 }

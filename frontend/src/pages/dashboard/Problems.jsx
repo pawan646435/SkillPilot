@@ -1,7 +1,7 @@
 // src/pages/dashboard/Problems.jsx
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus, Code2, Search, Filter, Trash2, Edit, Eye, ChevronDown, Tag, Clock, HardDrive, CheckCircle2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { db } from "../../lib/firebase";
 import { collection, getDocs, deleteDoc, doc } from "firebase/firestore";
@@ -20,11 +20,11 @@ export default function Problems() {
   const[showFilter, setShowFilter] = useState(false);
   const [deleting, setDeleting] = useState(null);
 
-  const fetchProblems = async () => {
+  const fetchProblems = useCallback(async () => {
     try {
       const querySnapshot = await getDocs(collection(db, "problems"));
       let data = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-      
+
       // Client-side filtering
       if (search) {
         data = data.filter(p => p.title.toLowerCase().includes(search.toLowerCase()));
@@ -32,16 +32,16 @@ export default function Problems() {
       if (diffFilter) {
         data = data.filter(p => p.difficulty === diffFilter);
       }
-      
+
       setProblems(data);
     } catch (err) {
       console.error("Failed to fetch problems", err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [search, diffFilter]);
 
-  useEffect(() => { fetchProblems(); }, [search, diffFilter]);
+  useEffect(() => { fetchProblems(); }, [fetchProblems]);
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this problem? This cannot be undone.")) return;

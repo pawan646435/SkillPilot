@@ -48,7 +48,7 @@ if not os.getenv("FIRESTORE_EMULATOR_HOST"):
         "before running."
     )
 
-from app.services import embeddings, groq_client, panel_agents  # noqa: E402
+from app.services import embeddings, panel_agents  # noqa: E402
 from app.services.chunking import chunk_with_metadata  # noqa: E402
 from app.services.firestore_client import async_add, get_db  # noqa: E402
 from app.services.http_client import start_http_client, stop_http_client  # noqa: E402

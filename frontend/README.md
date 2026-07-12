@@ -6,12 +6,12 @@ SkillPilot is a sophisticated, AI-enhanced platform designed for modern intervie
 
 ## 🏗️ Project Architecture
 
-SkillPilot follows a modern **Serverless/Micro-Backend architecture** designed for scalability and low-latency real-time interactions:
+SkillPilot follows a **standalone FastAPI backend on Cloud Run** architecture designed for scalability and low-latency real-time interactions:
 
 - **Frontend Hub**: A high-performance Single Page Application (SPA) built with React and Vite. It leverages real-time listeners for collaborative features (like Code Battles) and a modular component system for a premium user experience.
-- **Backend Infrastructure**: Powered by **Firebase Cloud Functions (Generation 2)**. This layer acts as a secure proxy to sensitive external APIs and handles complex server-side logic (e.g., code evaluation, AI interview processing, scheduling).
+- **Backend Infrastructure**: Powered by a **FastAPI service on Google Cloud Run** (see `backend/README.md`) — a secure proxy to sensitive external APIs that handles complex server-side logic (e.g., code evaluation, AI interview processing, RAG-grounded multi-agent interviews). Replaces the earlier Firebase Cloud Functions + Vercel serverless split (see `docs/backend-migration-explained.md`).
 - **Real-time Engine**: Utilizes **Firestore** for multi-user synchronization in Code Battles and high-availability data storage.
-- **AI Domain**: Integrates **LLM (Groq)** via proxy functions to handle live interview persona simulation and final feedback reporting.
+- **AI Domain**: Integrates **LLM (Groq)** via the FastAPI backend to handle live interview persona simulation and final feedback reporting.
 
 ---
 
@@ -25,16 +25,16 @@ SkillPilot follows a modern **Serverless/Micro-Backend architecture** designed f
 - **Editor**: Monaco Editor (The core of VS Code) for the IDE experience
 
 ### Backend & Infrastructure
-- **Cloud Provider**: Google Firebase (deployed in `asia-south1`)
-- **Serverless**: Firebase Cloud Functions (Node.js)
+- **Cloud Provider**: Google Cloud Run (deployed in `asia-south1`)
+- **Backend**: FastAPI (Python) — see `backend/README.md`
 - **Database**: Firestore (NoSQL, real-time sync)
 - **Authentication**: Firebase Auth (Social Login + Email/Password)
-- **Secret Management**: `.env` driven backend configurations
+- **Secret Management**: Google Secret Manager (`--set-secrets`) in production, `.env` locally
 
 ### External Integrations
 - **AI Engine**: Groq SDK (Powered by Llama 3 / Mixtral)
 - **Job Engine**: JSearch API (Optimized for India-only job discovery)
-- **News Engine**: GNews API (Personalized tech news feed)
+- **News Engine**: Currents API (Personalized tech news feed)
 
 ---
 
@@ -75,9 +75,9 @@ SkillPilot follows a modern **Serverless/Micro-Backend architecture** designed f
    ```bash
    npm install
    ```
-3. Setup Firebase:
+3. Setup Firebase & backend:
    - Ensure your Firebase project is configured in `src/lib/firebase.js`.
-   - Deploy backend functions located in `firebase-backend/proxy functions for api key/functions`.
+   - Run the FastAPI backend locally per `backend/README.md`, and point `VITE_API_BASE_URL` (see `.env.example`) at it.
 4. Run locally:
    ```bash
    npm run dev

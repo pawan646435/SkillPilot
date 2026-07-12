@@ -1,17 +1,16 @@
-"""Shared configuration: region, CORS allowlist, env var loading.
+"""Shared configuration: CORS allowlist, env var loading.
 
 Mirrors firebase-backend/proxy functions for api key/functions/src/config.js —
 same allowlisted origins, same intent, just no `region`/`maxInstances`/`memory`
 concept since Cloud Run scales differently than Cloud Functions (see
-docs/backend-migration-explained.md for why).
+docs/backend-migration-explained.md for why) — deploy-time region is set via
+deploy.sh's --region flag instead of a constant here.
 """
 import os
 
 from dotenv import load_dotenv
 
 load_dotenv()
-
-REGION = "asia-south1"
 
 # Kept as a literal list (not env-driven) for the same reason the original
 # functions/src/config.js hardcoded it: it's a small, rarely-changing
@@ -31,7 +30,6 @@ CORS_ALLOW_ORIGIN_REGEX = r"^https://skill-pilot-[a-z0-9]+-pawan-kumars-projects
 DEBUG = os.getenv("DEBUG", "false").lower() == "true"
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "")
-GNEWS_API_KEY = os.getenv("GNEWS_API_KEY", "")
 CURRENTS_API_KEY = os.getenv("CURRENTS_API_KEY", "")
 JSEARCH_API_KEY = os.getenv("JSEARCH_API_KEY", "")
 FIREBASE_PROJECT_ID = os.getenv("FIREBASE_PROJECT_ID", "")

@@ -12,7 +12,7 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 from firebase_admin import firestore
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from app.config import GROQ_MODEL
 from app.dependencies.auth import DecodedUser, require_auth

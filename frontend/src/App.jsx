@@ -55,9 +55,8 @@ const InterviewSetup = lazy(() => import("./pages/InterviewSetup"));
 const InterviewRoom = lazy(() => import("./pages/InterviewRoom"));
 const InterviewReport = lazy(() => import("./pages/InterviewReport"));
 
-// Dev-only test pages (not linked from any nav)
-const RagIngestTest = lazy(() => import("./pages/dev/RagIngestTest"));
-const PanelTest = lazy(() => import("./pages/dev/PanelTest"));
+// Dev-only test page (not linked from any nav, DEV-build only -- see route below)
+const PanelTest = import.meta.env.DEV ? lazy(() => import("./pages/dev/PanelTest")) : null;
 
 function RouteFallback() {
   return (
@@ -97,9 +96,8 @@ function App() {
             <Route path="/interview/room" element={<InterviewRoom />} />
             <Route path="/interview/report" element={<InterviewReport />} />
 
-            {/* DEV-ONLY TEST PAGES */}
-            <Route path="/dev/rag-ingest-test" element={<RagIngestTest />} />
-            <Route path="/dev/panel-test" element={<PanelTest />} />
+            {/* DEV-ONLY TEST PAGE (import.meta.env.DEV only, stripped from production builds) */}
+            {import.meta.env.DEV && <Route path="/dev/panel-test" element={<PanelTest />} />}
 
             {/* DASHBOARD ROUTES WITH SIDEBAR */}
             <Route path="/dashboard" element={<DashboardLayout />}>
