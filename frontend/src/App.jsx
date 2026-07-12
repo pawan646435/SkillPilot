@@ -3,6 +3,8 @@ import { lazy, Suspense } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import SmoothScroll from "./components/SmoothScroll";
 import CustomCursor from "./components/CustomCursor";
+import ClashMobileBlock from "./pages/ClashMobileBlock";
+import { useIsMobileDevice } from "./hooks/useIsMobileDevice";
 
 // Public Pages
 const MainLayout = lazy(() => import("./components/MainLayout"));
@@ -72,6 +74,18 @@ function RouteFallback() {
   );
 }
 
+// Decides BEFORE Clash's module ever loads (its Monaco Editor import, its
+// Firestore listeners, its boot-sequence animation all live inside that
+// lazy-loaded module) whether to render it at all. On a real mobile device,
+// <Clash /> is simply never the result of this render -- React's lazy()
+// only triggers the dynamic import() when a lazy component actually gets
+// rendered, so ClashMobileBlock (a plain, dependency-free component) is the
+// only thing that ever mounts for a phone-sized touch device.
+function ClashGate() {
+  const isMobile = useIsMobileDevice();
+  return isMobile ? <ClashMobileBlock /> : <Clash />;
+}
+
 function App() {
   return (
     <BrowserRouter>
@@ -98,7 +112,7 @@ function App() {
             {/* FULL SCREEN INTERFACES - Lenis disabled on these */}
             <Route path="/assessment/invite/:token" element={<InviteVerify />} />
             <Route path="/assessment/take/:id" element={<TakeAssessment />} />
-            <Route path="/clash" element={<Clash />} />
+            <Route path="/clash" element={<ClashGate />} />
 
             {/* AI INTERVIEW - Full screen for room & report (Classic, unchanged) */}
             <Route path="/interview/room" element={<InterviewRoom />} />

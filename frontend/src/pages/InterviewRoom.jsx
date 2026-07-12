@@ -243,15 +243,15 @@ export default function InterviewRoom() {
       </div>
 
       {/* Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-6 h-14 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-xl">
-        <div className="flex items-center gap-3">
-          <BrainCircuit className="w-5 h-5 text-emerald-400" />
-          <span className="text-sm font-semibold text-white font-display">AI Interview</span>
-          <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-xs text-neutral-500 font-mono">
+      <div className="fixed top-0 left-0 right-0 z-40 flex items-center justify-between px-4 sm:px-6 h-14 border-b border-white/5 bg-[#0a0a0a]/80 backdrop-blur-xl">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+          <BrainCircuit className="w-5 h-5 text-emerald-400 shrink-0" />
+          <span className="hidden text-sm font-semibold text-white font-display sm:inline">AI Interview</span>
+          <span className="px-2 py-0.5 rounded-md bg-white/5 border border-white/10 text-xs text-neutral-500 font-mono truncate">
             {role}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           <span className="font-mono text-xs text-neutral-600">
             {questionIndex + (phase === PHASE.LOADING_QUESTION ? 0 : 1)}/{questionCount}
           </span>

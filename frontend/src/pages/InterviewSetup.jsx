@@ -158,7 +158,7 @@ export default function InterviewSetup() {
             <label className="block mb-3 text-sm font-medium text-neutral-300">
               Difficulty
             </label>
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3">
               {DIFFICULTIES.map((d) => {
                 const Icon = d.icon;
                 const isActive = difficulty === d.id;
@@ -166,7 +166,7 @@ export default function InterviewSetup() {
                   <button
                     key={d.id}
                     onClick={() => setDifficulty(d.id)}
-                    className={`p-4 rounded-xl border transition-all duration-200 text-left ${
+                    className={`p-3 sm:p-4 rounded-xl border transition-all duration-200 text-left ${
                       isActive
                         ? `${d.activeBg} ${d.activeBorder}`
                         : `${d.bg} ${d.border} hover:border-white/20`

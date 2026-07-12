@@ -64,7 +64,7 @@ export default function Home() {
 
       {/* ─── BENTO FEATURES ─── */}
       <section id="features" className="px-6 py-24 mx-auto max-w-7xl">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-[300px]">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 auto-rows-auto md:auto-rows-[300px]">
 
           {/* Feature 1 (Large, NEW hero feature) */}
           <motion.div
