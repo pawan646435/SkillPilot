@@ -2,9 +2,8 @@
 
 Mirrors firebase-backend/proxy functions for api key/functions/src/config.js —
 same allowlisted origins, same intent, just no `region`/`maxInstances`/`memory`
-concept since Cloud Run scales differently than Cloud Functions (see
-docs/backend-migration-explained.md for why) — deploy-time region is set via
-deploy.sh's --region flag instead of a constant here.
+concept since Cloud Run scales differently than Cloud Functions — deploy-time
+region is set via deploy.sh's --region flag instead of a constant here.
 """
 import os
 
