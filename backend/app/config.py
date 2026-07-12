@@ -17,6 +17,7 @@ load_dotenv()
 CORS_ALLOW_ORIGINS = [
     "http://localhost:5173",  # Vite dev server
     "https://skill-pilot-coral.vercel.app",  # Production frontend
+    "https://skillpilot-coral.vercel.app",  # Production frontend (no-hyphen alias, also live)
 ]
 
 # Vercel Preview deployments get a fresh, randomly-generated subdomain every

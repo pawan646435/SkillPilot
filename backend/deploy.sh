@@ -31,7 +31,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --allow-unauthenticated \
   --min-instances=0 \
   --max-instances=3 \
-  --memory=1Gi \
+  --memory=2Gi \
   --cpu=1 \
   --timeout=120s \
   --set-env-vars="FIREBASE_PROJECT_ID=${PROJECT_ID},DEBUG=false" \
